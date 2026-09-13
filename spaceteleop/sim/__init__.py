@@ -1,16 +1,23 @@
-"""MuJoCo scene for task v0 "capture": SO-100 arm, zero g, one free-floating box.
+"""MuJoCo scenes for the two testbed tasks of SYNTHESIS section 3, zero g.
 
-The Menagerie `so_arm100.xml` text is patched (string surgery, per spec) to add:
-zero gravity, a `grasp` site between the jaw pads, a free-floating box `obj`, and a
-visual target site. Grasping is kinematic: when the jaw is commanded closed and the box
-centre is inside `GRASP_TOL` of the grasp site, the box is carried by the site until the
-jaw opens again.
+`capture` (task 2): a free-floating box drifting at 2-5 cm/s and tumbling at up to 1 rad/s.
+Grasp it inside a jaw-scale envelope and hold it in the target region. The operator only
+ever sees where the box WAS, so the steady-state chase error is (box speed x loop delay);
+at GRASP_TOL = 20 mm that error decides the episode, which is the whole point.
 
-# ponytail: kinematic attach inside a 50 mm capture envelope instead of a friction grasp,
-# i.e. a soft-capture/snare proxy rather than the SO-100's 20 mm jaw. Real pad friction on
-# a 16 mm box with a 3.5 N gripper is a tuning project of its own and is not what this
-# program measures; contact physics still applies *before* capture, so a late, overshooting
-# operator still knocks the target away, which is the latency failure mode we care about.
+`peg` (task 5): a 60 mm peg hanging from the jaw by its top with an unknown lateral grasp
+offset, inserted into a hole in a fixture bolted to the cage floor, CLEAR = 6 mm per side.
+Touching the fixture while the tip is below the fixture top jams the peg: it is left behind
+in the world and the operator has to withdraw and come back for it.
+
+Both scenes carry the cage of section 5 item 5: six static walls whose interior IS the
+keep-out box, so end-effector escape and cage contact are both observable events.
+
+# ponytail: grasping is kinematic (the object rides the grasp site inside a capture
+# envelope) and the peg is held rigidly upright, so only XY alignment and depth decide the
+# insertion. Real pad friction on a 16 mm box with a 3.5 N gripper is a tuning project of
+# its own and is not what this program measures; contact physics still applies BEFORE
+# capture and before insertion, which is where the latency failure mode lives.
 # Upgrade path: equality weld at the pads, then a true friction grasp.
 """
 import numpy as np
@@ -20,23 +27,79 @@ from robot_descriptions import so_arm100_mj_description as _d
 NJ = 6                      # SO-100 joints: Rotation Pitch Elbow Wrist_Pitch Wrist_Roll Jaw
 JAW = 5
 JAW_OPEN, JAW_CLOSED = 1.2, 0.0
-GRASP_TOL = 0.050           # m, box centre to grasp site (soft capture envelope)
+VMAX = 2.0                  # rad/s rated joint velocity [design choice], SYNTHESIS 5 item 4
+
+# cage interior = keep-out box. Encloses the arm; the arm can reach x = +-0.42, so the
+# side walls are a real limit and not decoration.
+CAGE_LO = np.array([-0.32, -0.44, -0.04])
+CAGE_HI = np.array([0.32, 0.22, 0.44])
+
+# --- capture ---
+GRASP_TOL = 0.020           # m, box centre to grasp site (jaw-scale capture envelope)
 TARGET_POS = np.array([0.16, -0.16, 0.22])
 TARGET_R = 0.05
 HOLD_S = 0.2                # must stay in the target region this long
 BOX = 0.008                 # half-size
+DRIFT = (0.020, 0.045)      # m/s, SYNTHESIS section 3 task 2 (2-5 cm/s)
+TUMBLE = (0.3, 1.0)         # rad/s, task 2 (<= 1 rad/s)
+
+# --- peg ---
+PEG_H = 0.030               # half-length: a 60 mm peg
+CLEAR = 0.006               # m of radial clearance per side
+HOLE = np.array([0.15, -0.27, 0.0])     # hole axis (x, y); z is the cage floor
+FIX_TOP = 0.07              # fixture top face, m
+DEPTH = 0.025               # tip this far below FIX_TOP = inserted
+APPROACH_Z = 0.145          # peg centre height for the align phase
+INSERT_Z = FIX_TOP - DEPTH + PEG_H - 0.004   # peg centre height that clears DEPTH
+GRIP_R = 0.012              # regrasp radius after a jam
+OFFSET = 0.006              # m, unknown lateral grasp offset drawn U(-OFFSET, OFFSET)
+GRIP = np.array([0.0, 0.0, PEG_H])   # peg centre -> the point the jaw holds (its top)
 
 
-def _xml():
+def _cage():
+    t = 0.005
+    c, h = (CAGE_LO + CAGE_HI) / 2, (CAGE_HI - CAGE_LO) / 2
+    out = []
+    for ax in range(3):
+        s = h.copy()
+        s[ax] = t
+        for sgn in (-1, 1):
+            p = c.copy()
+            p[ax] = (CAGE_HI if sgn > 0 else CAGE_LO)[ax] + sgn * t
+            out.append(f'<geom name="cagewall{ax}{sgn}" type="box" pos="{p[0]} {p[1]} {p[2]}" '
+                       f'size="{s[0]} {s[1]} {s[2]}" rgba="0.4 0.5 0.6 0.10"/>')
+    return "\n".join(out)
+
+
+def _fixture():
+    """Four blocks around a square hole of half-width BOX + CLEAR, standing on the floor."""
+    w, t, hz = BOX + CLEAR, 0.012, (FIX_TOP - CAGE_LO[2]) / 2
+    z = CAGE_LO[2] + hz
+    out = []
+    for ax in (0, 1):
+        for sgn in (-1, 1):
+            p, s = HOLE.copy(), [w + 2 * t, w + 2 * t, hz]
+            p[2] = z
+            p[ax] += sgn * (w + t)
+            s[ax] = t
+            out.append(f'<geom name="holewall{ax}{sgn}" type="box" pos="{p[0]} {p[1]} {p[2]}" '
+                       f'size="{s[0]} {s[1]} {s[2]}" rgba="0.5 0.5 0.55 1"/>')
+    return "\n".join(out)
+
+
+def _xml(task):
     src = open(_d.MJCF_PATH).read()
     site = ('<site name="grasp" pos="0 -0.085 0" size="0.004" rgba="0 1 0 0.4"/>\n'
             '<body name="Moving_Jaw"')
+    sz = f"{BOX} {BOX} {PEG_H}" if task == "peg" else f"{BOX} {BOX} {BOX}"
     world = f'''
     <body name="obj" pos="0 -0.30 0.15">
       <freejoint name="obj_free"/>
-      <geom name="obj" type="box" size="{BOX} {BOX} {BOX}" mass="0.05" rgba="0.9 0.4 0.1 1"
+      <geom name="obj" type="box" size="{sz}" mass="0.05" rgba="0.9 0.4 0.1 1"
             solimp="0.9 0.95 0.005" solref="0.02 1"/>
     </body>
+    {_cage()}
+    {_fixture() if task == "peg" else ""}
     <site name="target" pos="{TARGET_POS[0]} {TARGET_POS[1]} {TARGET_POS[2]}"
           size="{TARGET_R}" rgba="0.2 0.6 1 0.15"/>
     </worldbody>'''
@@ -46,37 +109,56 @@ def _xml():
                .replace('</worldbody>', world, 1))
 
 
-def build():
-    m = mujoco.MjModel.from_xml_string(_xml())
+def build(task="capture"):
+    m = mujoco.MjModel.from_xml_string(_xml(task))
     return m, mujoco.MjData(m)
 
 
 def ids(m):
     g = lambda t, n: mujoco.mj_name2id(m, t, n)
+    names = [mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_GEOM, i) or "" for i in range(m.ngeom)]
     return dict(site=g(mujoco.mjtObj.mjOBJ_SITE, "grasp"),
                 obj=g(mujoco.mjtObj.mjOBJ_BODY, "obj"),
+                objg=g(mujoco.mjtObj.mjOBJ_GEOM, "obj"),
+                cage={i for i, n in enumerate(names) if n.startswith("cagewall")},
+                fix={i for i, n in enumerate(names) if n.startswith("holewall")},
                 qadr=m.jnt_qposadr[g(mujoco.mjtObj.mjOBJ_JOINT, "obj_free")],
                 vadr=m.jnt_dofadr[g(mujoco.mjtObj.mjOBJ_JOINT, "obj_free")])
 
 
-def reset(m, d, seed):
-    """Fixed-seed reset -> state dict. Box starts inside reach with a small drift/tumble."""
+def reset(m, d, seed, task="capture"):
+    """Fixed-seed reset -> state dict carrying the task and its safety-event counters."""
     rng = np.random.default_rng(seed)
     mujoco.mj_resetDataKeyframe(m, d, 0)          # "home"
     i = ids(m)
-    d.qpos[i["qadr"] + 3:i["qadr"] + 7] = [1, 0, 0, 0]
-    for _ in range(100):                          # spawn clear of the arm, in front of the jaw
-        d.qpos[i["qadr"]:i["qadr"] + 3] = [rng.uniform(-.10, .10), rng.uniform(-.34, -.28),
-                                           rng.uniform(.06, .20)]
+    a, v = i["qadr"], i["vadr"]
+    d.qpos[a + 3:a + 7] = [1, 0, 0, 0]
+    st = dict(ids=i, task=task, grasped=False, off=np.zeros(3), in_region_since=None,
+              success=False, jammed=False, jams=0, keepout=0, cage_hits=0,
+              t_out=None, t_hit=None)
+    if task == "peg":
+        st["pin"], st["left"] = None, False
+        mujoco.mj_forward(m, d)
+        st["grasped"] = True
+        st["off"] = np.array([rng.uniform(-OFFSET, OFFSET),
+                              rng.uniform(-OFFSET, OFFSET), 0.0]) - GRIP
+        d.qpos[a:a + 3] = d.site_xpos[i["site"]] + st["off"]
+        mujoco.mj_forward(m, d)
+        return st
+    for _ in range(200):                          # spawn clear of the arm, within reach
+        d.qpos[a:a + 3] = [rng.uniform(-.10, .10), rng.uniform(-.34, -.28),
+                           rng.uniform(.08, .20)]
         mujoco.mj_forward(m, d)
         if d.ncon == 0:
             break
     else:
         raise RuntimeError("no free spawn")
-    d.qvel[i["vadr"]:i["vadr"] + 3] = rng.normal(0, .008, 3)      # ~1 cm/s drift
-    d.qvel[i["vadr"] + 3:i["vadr"] + 6] = rng.normal(0, .15, 3)   # slow tumble
+    u = rng.normal(size=3)
+    d.qvel[v:v + 3] = u / np.linalg.norm(u) * rng.uniform(*DRIFT)
+    w = rng.normal(size=3)
+    d.qvel[v + 3:v + 6] = w / np.linalg.norm(w) * rng.uniform(*TUMBLE)
     mujoco.mj_forward(m, d)
-    return dict(ids=i, grasped=False, off=np.zeros(3), in_region_since=None, success=False)
+    return st
 
 
 def obj_pose(d, st):
@@ -84,12 +166,47 @@ def obj_pose(d, st):
     return np.array(d.qpos[a:a + 7])
 
 
+def _touching(d, gset, other=None, but=None):
+    """Is any geom in `gset` in contact? `other` restricts, `but` excludes, the partner."""
+    for k in range(d.ncon):
+        g1, g2 = d.contact.geom1[k], d.contact.geom2[k]
+        if not (g1 in gset or g2 in gset):
+            continue
+        partner = g2 if g1 in gset else g1
+        if (other is None or partner == other) and partner != but:
+            return True
+    return False
+
+
+EVENT_GAP = 0.25    # s of clean time before a renewed contact counts as a NEW event
+
+
+def _edge(st, key, on, t):
+    """Count one event per contiguous spell of `on`. Without the debounce a single sustained
+    press on a cage wall chatters into hundreds of rising edges."""
+    if on:
+        last = st["t_" + key]
+        if last is None or t - last > EVENT_GAP:
+            st[{"out": "keepout", "hit": "cage_hits"}[key]] += 1
+        st["t_" + key] = t
+    return on
+
+
 def step(m, d, ctrl, st, t):
-    """One sim step with the current joint setpoint. Handles capture and the success test."""
+    """One sim step with the current joint setpoint. Handles the task and safety events."""
     d.ctrl[:NJ] = np.clip(ctrl[:NJ], m.jnt_range[:NJ, 0], m.jnt_range[:NJ, 1])
     mujoco.mj_step(m, d)
     i, a, v = st["ids"], st["ids"]["qadr"], st["ids"]["vadr"]
     gp = d.site_xpos[i["site"]]
+    _edge(st, "out", bool(np.any(gp < CAGE_LO) or np.any(gp > CAGE_HI)), t)
+    # the free object bouncing off a wall is not an unsafe MOTION event; the arm is
+    _edge(st, "hit", _touching(d, i["cage"], but=i["objg"]), t)
+    (_peg if st["task"] == "peg" else _capture)(m, d, st, gp, t)
+    return st["success"]
+
+
+def _capture(m, d, st, gp, t):
+    a, v = st["ids"]["qadr"], st["ids"]["vadr"]
     closing = d.ctrl[JAW] < 0.5 * JAW_OPEN
     if st["grasped"]:
         if not closing:
@@ -100,7 +217,7 @@ def step(m, d, ctrl, st, t):
             d.qvel[v:v + 6] = 0
             mujoco.mj_forward(m, d)
     elif closing and np.linalg.norm(d.qpos[a:a + 3] - gp) < GRASP_TOL:
-        st["grasped"], st["off"] = True, d.qpos[a:a + 3] - gp   # reel the offset in, no teleport
+        st["grasped"], st["off"] = True, d.qpos[a:a + 3] - gp   # reel the offset in
     inside = st["grasped"] and np.linalg.norm(d.qpos[a:a + 3] - TARGET_POS) < TARGET_R
     if not inside:
         st["in_region_since"] = None
@@ -108,4 +225,26 @@ def step(m, d, ctrl, st, t):
         st["in_region_since"] = t
     elif t - st["in_region_since"] >= HOLD_S:
         st["success"] = True
-    return st["success"]
+
+
+def _peg(m, d, st, gp, t):
+    """A peg whose lateral error exceeds CLEAR at the mouth binds: it stops where it is
+    while the gripper keeps going, which is what the operator sees (the peg no longer
+    tracks the jaw). Recovery is to withdraw and come back to it."""
+    i, a, v = st["ids"], st["ids"]["qadr"], st["ids"]["vadr"]
+    touch = _touching(d, i["fix"], i["objg"])
+    tip = d.qpos[a + 2] - PEG_H
+    if st["jammed"]:
+        far = np.linalg.norm(st["pin"] + GRIP - gp) > GRIP_R
+        st["left"] = st["left"] or far
+        if st["left"] and not far:                              # withdrew AND came back
+            st["jammed"], st["off"] = False, st["pin"] - gp
+    elif touch and tip < FIX_TOP:                               # wedged in the mouth
+        st["jammed"], st["jams"], st["left"] = True, st["jams"] + 1, False
+        st["pin"] = d.qpos[a:a + 3].copy()
+    d.qpos[a:a + 3] = st["pin"] if st["jammed"] else gp + st["off"]
+    d.qpos[a + 3:a + 7] = [1, 0, 0, 0]
+    d.qvel[v:v + 6] = 0
+    mujoco.mj_forward(m, d)
+    inside = np.linalg.norm((d.qpos[a:a + 2] - HOLE[:2])) < BOX + CLEAR
+    st["success"] = st["success"] or (inside and not touch and tip <= FIX_TOP - DEPTH)

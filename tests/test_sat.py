@@ -1,4 +1,4 @@
-"""Self-check: no fresh commands past timeout_s -> setpoint freezes and safety_hold set."""
+"""Self-check: the SYNTHESIS section 5 (c) envelopes. Hold, retract, ramp, seq playout."""
 import socket
 import threading
 import time
@@ -10,42 +10,96 @@ from spaceteleop.proto import F_SAFETY_HOLD, pack_cmd, unpack_tel
 from spaceteleop.sat.controller import run_episode
 from spaceteleop.strategies.baseline import Baseline
 
+TARGET = [0.6, -1.2, 1.2, 1.0, -1.0, 0.0, 0.0]
 
-def test_hold_on_timeout():
-    m, d = sim.build()
+
+def _pair():
     sat = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sat.bind(("127.0.0.1", 0))
     sat.setblocking(False)
     gnd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     gnd.bind(("127.0.0.1", 0))
     gnd.settimeout(1.0)
-    stop = []
-    th = threading.Thread(target=run_episode, daemon=True, args=(
-        m, d, sat, gnd.getsockname(), 0, Baseline()),
-        kwargs=dict(max_s=3.0, stop=lambda: bool(stop)))
+    return sat, gnd
+
+
+def _run(strategy, feed, max_s=6.0):
+    """Start a satellite, run `feed(sat_addr)`, stop it. -> (data, summary, telemetry)."""
+    m, d = sim.build()
+    sat, gnd = _pair()
+    out, stop = {}, []
+    th = threading.Thread(target=lambda: out.update(run_episode(
+        m, d, sat, gnd.getsockname(), 0, strategy, max_s=max_s,
+        stop=lambda: bool(stop))), daemon=True)
     th.start()
-
-    target = [0.6, -1.2, 1.2, 1.0, -1.0, 0.0, 0.0]
-    for i in range(30):                       # 0.6 s of commands at 50 Hz
-        gnd.sendto(pack_cmd(i, time.monotonic_ns(), target), sat.getsockname())
-        time.sleep(0.02)
-    t_silence = time.monotonic_ns()
-    time.sleep(1.2)                           # silence > timeout_s = 0.5
+    feed(sat.getsockname())
     stop.append(1)
-    th.join(2.0)
-
-    held, q = [], None
+    th.join(3.0)
+    tels = []
     gnd.setblocking(False)
-    while True:                               # drain the whole episode, then look past the timeout
+    while True:
         try:
-            t = unpack_tel(gnd.recv(65535))
+            tels.append(unpack_tel(gnd.recv(65535)))
         except (BlockingIOError, OSError):
             break
-        if t["t_send"] > t_silence + 0.6e9:   # timeout_s elapsed with no command
-            held.append(bool(t["flags"] & F_SAFETY_HOLD))
-            q = np.array(t["q"][:6])
+    return d, out, tels
 
-    assert held and all(held), held                       # every sample inside the silence
+
+def test_hold_on_timeout():
+    t_silence = []
+
+    def feed(addr):
+        for i in range(40):                       # 0.8 s of commands at 50 Hz
+            socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(
+                pack_cmd(i, time.monotonic_ns(), TARGET), addr)
+            time.sleep(0.02)
+        t_silence.append(time.monotonic_ns())
+        time.sleep(1.0)                           # silence > timeout_s = 0.3
+
+    d, out, tels = _run(Baseline(), feed)
+    held = [bool(t["flags"] & F_SAFETY_HOLD) for t in tels
+            if t["t_send"] > t_silence[0] + 0.4e9]
+    assert held and all(held), held
     frozen = np.array(d.ctrl[:6])
-    assert np.allclose(frozen, target[:6], atol=0.05), frozen   # setpoint is the last one
-    assert q is not None and np.allclose(q, frozen, atol=0.15), (q, frozen)
+    assert np.allclose(frozen, TARGET[:6], atol=0.05), frozen
+    assert out["events"]["move_in_hold"] == 0      # hold means hold: never a new setpoint
+    assert out["events"]["hold"] == 1 and out["events"]["retract"] == 0
+
+
+def test_retract_after_long_silence_is_ramped():
+    def feed(addr):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        for i in range(25):
+            s.sendto(pack_cmd(i, time.monotonic_ns(), TARGET), addr)
+            time.sleep(0.02)
+        time.sleep(2.2)                            # > retract_s below
+
+    d, out, _ = _run(Baseline(timeout_s=0.2, retract_s=0.6), feed, max_s=6.0)
+    assert out["events"]["retract"] == 1
+    home = np.array([0.0, -1.57, 1.57, 1.57, -1.57, 0.0])
+    assert np.allclose(d.ctrl[:6], home, atol=0.05), d.ctrl[:6]   # back at the reset pose
+    log = out["satlog"]
+    t = np.array([r[0] for r in log]) / 1e9
+    sp = np.array([r[4] for r in log])[:, :6]
+    v = np.abs(np.diff(sp, axis=0)).max(1) / np.diff(t)
+    assert v.max() <= Baseline.vmax * 1.05, v.max()               # never a jump
+
+
+def test_playout_is_keyed_on_sequence_not_arrival():
+    """Delivered out of order, the buffer must never play an older setpoint after a newer
+    one. Joint 0 rises monotonically with seq, so any regression is a backwards jump."""
+    def feed(addr):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        pkts = [pack_cmd(i, time.monotonic_ns(), [0.02 * i] + TARGET[1:]) for i in range(40)]
+        for i in range(0, 40, 2):                  # swap every neighbouring pair
+            s.sendto(pkts[i + 1], addr)
+            time.sleep(0.02)
+            s.sendto(pkts[i], addr)
+            time.sleep(0.02)
+        time.sleep(0.2)
+
+    _, out, _ = _run(Baseline(), feed, max_s=4.0)
+    assert out["reordered"] == 20, out["reordered"]
+    sp = np.array([r[4] for r in out["satlog"]])[:, 0]
+    assert np.all(np.diff(sp) >= -1e-9), sp[np.argmin(np.diff(sp))]
+    assert np.all(np.diff(np.array([r[2] for r in out["satlog"]])) >= 0)

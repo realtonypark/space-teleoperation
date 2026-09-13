@@ -22,7 +22,7 @@ import numpy as np
 from ..proto import F_DONE, F_SAFETY_HOLD, F_SUCCESS, pack_cmd, unpack_tel
 
 
-def run_episode(sock, up_addr, operator, strategy, cmd_hz=50.0, tau_h=0.25, max_s=30.0):
+def run_episode(sock, up_addr, operator, strategy, cmd_hz=50.0, tau_h=0.17, max_s=20.0):
     """Drive one episode. Returns (rows, stats). Ends when telemetry says done."""
     dt = 1.0 / cmd_hz
     t0 = next_send = time.monotonic()

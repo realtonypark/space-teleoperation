@@ -11,6 +11,13 @@ Mapping to a real LeRobot v2.0 dataset:
   timestamp, frame_index, episode_index, index, next.done   same names, same meaning
 Extras outside the LeRobot schema (kept as plain columns, harmless to a loader that
 ignores them): cmd_seq, rtt_ms, owd_up_ms, safety_hold.
+
+Sidecar `data/episode_%06d_sat.npz` holds the SATELLITE side, one row per control cycle:
+`t_ns` (the cycle), `t_applied_ns` (when the newest command first reached the arm),
+`cmd_seq`, `hold`, `setpoint` (7). The main table pairs the newest telemetry the ground
+held with the command it sent on the same tick, which on leo_relay is ~85 ms of
+observation-action skew; anything that needs the true applied action at a true instant
+re-pairs it from here instead of trusting that skew.
 To convert: read the npz, build a pandas DataFrame per episode, write parquet. No
 lerobot dependency here on purpose.
 # ponytail: npz + jsonl, no parquet/pyarrow dependency. Add the converter when a training
@@ -26,7 +33,21 @@ COLS = ["observation.state", "action", "timestamp", "frame_index", "episode_inde
         "index", "next.done", "cmd_seq", "rtt_ms", "owd_up_ms", "safety_hold"]
 
 
-def write_episode(out_dir, ep_index, rows, task="capture", index0=0):
+def write_sat(out_dir, ep_index, satlog):
+    """satlog: [(t_ns, t_applied_ns, cmd_seq, hold, setpoint7)] -> npz path (or None)."""
+    if not satlog:
+        return None
+    path = f"{out_dir}/data/episode_{ep_index:06d}_sat.npz"
+    np.savez_compressed(
+        path, t_ns=np.array([r[0] for r in satlog], np.int64),
+        t_applied_ns=np.array([r[1] for r in satlog], np.int64),
+        cmd_seq=np.array([r[2] for r in satlog], np.int64),
+        hold=np.array([r[3] for r in satlog], bool),
+        setpoint=np.array([r[4] for r in satlog], np.float32))
+    return path
+
+
+def write_episode(out_dir, ep_index, rows, task="capture", index0=0, satlog=()):
     """rows: list of dicts with the COLS keys (minus index/episode_index). -> npz path."""
     os.makedirs(f"{out_dir}/data", exist_ok=True)
     os.makedirs(f"{out_dir}/meta", exist_ok=True)
@@ -46,6 +67,7 @@ def write_episode(out_dir, ep_index, rows, task="capture", index0=0):
     }
     path = f"{out_dir}/data/episode_{ep_index:06d}.npz"
     np.savez_compressed(path, **arr)
+    write_sat(out_dir, ep_index, satlog)
     with open(f"{out_dir}/meta/episodes.jsonl", "a") as f:
         f.write(json.dumps({"episode_index": ep_index, "tasks": [task], "length": n}) + "\n")
     json.dump({"codebase_version": "v2.0", "robot_type": "so_arm100", "fps": FPS,
@@ -59,3 +81,9 @@ def write_episode(out_dir, ep_index, rows, task="capture", index0=0):
 def load_episode(path):
     with np.load(path) as z:
         return {k: z[k] for k in z.files}
+
+
+def load_sat(path):
+    """Sidecar next to `path`, or None if the episode carried no satellite log."""
+    p = path.replace(".npz", "_sat.npz")
+    return load_episode(p) if os.path.exists(p) else None

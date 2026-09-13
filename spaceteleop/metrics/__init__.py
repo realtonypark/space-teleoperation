@@ -1,58 +1,134 @@
-"""Episode metrics. Input is what record.load_episode returns plus a per-episode summary.
+"""Episode metrics: throughput, link, smoothness and the SYNTHESIS section 6 safety counts.
 
 demos_per_hour follows the spec: 3600 / mean wall time of the SUCCESSFUL episodes. It
 therefore ignores the wall time burned by failures; read it together with success_rate.
-Path smoothness is the sum of squared joint jerk of the commanded action (third difference
-over the command period), which is what the operator asked the arm to do.
+
+Smoothness is reported, never gated (section 6): robomimic showed operators who both hit
+high success rates produced very different policies, and SAL/LDLJ are the two measures
+that separate them. Both are computed on the joint-space speed of `observation.state`,
+i.e. what the arm actually did, not what the ground asked for.
+  SAL  spectral arc length of the speed profile, Balasubramanian et al. 2015. Less
+       negative = smoother. Dimensionless, amplitude-normalised, so it compares runs of
+       different duration.
+  LDLJ log dimensionless jerk. Also less negative = smoother.
+`stall_frac` is the fraction of frames with speed under STALL: the move-and-wait signature.
+
+Unsafe motion (section 6) is four counts, all of which must be zero for a profile to pass:
+  move_in_hold  the commanded setpoint changed while in hold
+  vel_over      an emitted joint velocity above the clamp (measured on the satellite's own
+                applied-setpoint log, not asserted from the ramp limiter)
+  keepout       the end effector left the keep-out box = the cage interior
+  cage          the arm touched the cage
+`ramp_clip`, `pos_clamp`, `hold`, `retract`, `jams` and `stale` are diagnostics, not
+violations. `cmd_loss` is loss as the SETPOINT BUFFER sees it: a packet the link delivered
+but whose sequence was older than one already received counts as lost, because the buffer
+drops it. `stale` is how many of those there were; link-level loss is in Link.stats().
 """
 import numpy as np
+
+STALL = 0.05        # rad/s of joint-space speed below which the arm is "waiting"
+SAFE = ("move_in_hold", "vel_over", "keepout", "cage")
 
 
 def percentile(a, p):
     return float(np.percentile(a, p)) if len(a) else float("nan")
 
 
-def episode_metrics(ep, success, duration_s, cmds_sent, cmds_rx):
+def sal(v, dt, fc=10.0, amp_th=0.05):
+    """Spectral arc length of speed profile `v` (Balasubramanian et al. 2015)."""
+    v = np.asarray(v, float)
+    if len(v) < 8 or not np.any(v):
+        return float("nan")
+    n = int(2 ** (np.ceil(np.log2(len(v))) + 2))
+    mag = np.abs(np.fft.rfft(v, n))
+    mag /= mag.max()
+    f = np.fft.rfftfreq(n, dt)
+    k = f <= fc
+    mag, f = mag[k], f[k]
+    inx = np.where(mag >= amp_th)[0]
+    if len(inx) < 2:
+        return float("nan")
+    mag, f = mag[inx[0]:inx[-1] + 1], f[inx[0]:inx[-1] + 1]
+    df = np.diff(f) / (f[-1] - f[0] or 1.0)
+    return float(-np.sum(np.sqrt(df ** 2 + np.diff(mag) ** 2)))
+
+
+def ldlj(v, dt):
+    """Log dimensionless jerk of speed profile `v`. Less negative = smoother."""
+    v = np.asarray(v, float)
+    if len(v) < 8:
+        return float("nan")
+    peak = np.max(np.abs(v))
+    j = np.gradient(np.gradient(v, dt), dt)
+    e = np.trapezoid(j ** 2, dx=dt)
+    if peak <= 0 or e <= 0:
+        return float("nan")
+    return float(-np.log((len(v) * dt) ** 3 / peak ** 2 * e))
+
+
+def episode_metrics(ep, success, duration_s, cmds_sent, cmds_rx, events=None, sat=None,
+                    vmax=2.0):
     """ep: arrays from record.load_episode. -> flat dict of one episode's numbers."""
     rtt = np.asarray(ep["rtt_ms"])
     rtt = rtt[rtt > 0]
     hold = np.asarray(ep["safety_hold"])
     act = np.asarray(ep["action"], float)[:, :6]
+    obs = np.asarray(ep["observation.state"], float)[:, :6]
     d = np.diff(np.asarray(ep["timestamp"], float))
     period = float(np.median(d)) if len(d) else 0.02
     jerk = np.diff(act, 3, axis=0) / period ** 3 if len(act) > 3 else np.zeros((1, 6))
+    speed = np.linalg.norm(np.diff(obs, axis=0), axis=1) / period if len(obs) > 1 else np.zeros(1)
+    ev = dict(events or {})
+    ev["vel_over"] = _vel_over(sat, vmax)
     return dict(success=bool(success), duration_s=float(duration_s),
                 rtt_p50=percentile(rtt, 50), rtt_p95=percentile(rtt, 95),
                 rtt_max=float(rtt.max()) if len(rtt) else float("nan"),
                 cmd_loss=1.0 - cmds_rx / max(1, cmds_sent),
                 hold_frames=int(hold.sum()), hold_s=float(hold.sum()) * period,
-                jerk=float(np.sum(jerk ** 2)), frames=len(act))
+                jerk=float(np.sum(jerk ** 2)), frames=len(act),
+                sal=sal(speed, period), ldlj=ldlj(speed, period),
+                stall_frac=float(np.mean(speed < STALL)), events=ev,
+                unsafe=sum(int(ev.get(k, 0)) for k in SAFE))
+
+
+def _vel_over(sat, vmax):
+    """Control cycles on which the applied setpoint moved faster than the clamp."""
+    if sat is None or len(sat.get("t_ns", ())) < 2:
+        return 0
+    dt = np.diff(sat["t_ns"]) / 1e9
+    dq = np.abs(np.diff(np.asarray(sat["setpoint"], float)[:, :6], axis=0)).max(axis=1)
+    ok = dt > 1e-6
+    return int(np.sum(dq[ok] / dt[ok] > vmax * 1.05))    # 5 % for float and clock noise
 
 
 def aggregate(eps):
     """eps: list of episode_metrics dicts. -> summary incl. demos/hour."""
     ok = [e for e in eps if e["success"]]
     mean = lambda k, src: float(np.mean([e[k] for e in src])) if src else float("nan")
+    keys = set().union(*[e.get("events", {}) for e in eps]) if eps else set()
     return dict(episodes=len(eps), success_rate=len(ok) / max(1, len(eps)),
                 mean_duration_s=mean("duration_s", ok),
                 demos_per_hour=3600.0 / mean("duration_s", ok) if ok else 0.0,
                 rtt_p50=mean("rtt_p50", eps), rtt_p95=mean("rtt_p95", eps),
                 rtt_max=max([e["rtt_max"] for e in eps], default=float("nan")),
                 cmd_loss=mean("cmd_loss", eps), hold_s=mean("hold_s", eps),
-                jerk=mean("jerk", eps))
+                jerk=mean("jerk", eps), sal=mean("sal", eps), ldlj=mean("ldlj", eps),
+                stall_frac=mean("stall_frac", eps),
+                unsafe=sum(e["unsafe"] for e in eps),
+                events={k: sum(int(e.get("events", {}).get(k, 0)) for e in eps) for k in sorted(keys)})
 
 
-def table(name, agg):
-    return "\n".join([
-        f"profile          {name}",
-        f"episodes         {agg['episodes']}",
-        f"success_rate     {agg['success_rate']:.2f}",
-        f"mean_duration_s  {agg['mean_duration_s']:.2f}",
-        f"demos_per_hour   {agg['demos_per_hour']:.1f}",
-        f"rtt_p50_ms       {agg['rtt_p50']:.1f}",
-        f"rtt_p95_ms       {agg['rtt_p95']:.1f}",
-        f"rtt_max_ms       {agg['rtt_max']:.1f}",
-        f"cmd_loss         {agg['cmd_loss']:.3f}",
-        f"safety_hold_s    {agg['hold_s']:.2f}",
-        f"jerk_sum_sq      {agg['jerk']:.3g}",
-    ])
+def table(name, agg, extra=()):
+    rows = [("profile", name), ("episodes", agg["episodes"]),
+            ("success_rate", f"{agg['success_rate']:.2f}"),
+            ("mean_duration_s", f"{agg['mean_duration_s']:.2f}"),
+            ("demos_per_hour", f"{agg['demos_per_hour']:.1f}"),
+            ("rtt_p50_ms", f"{agg['rtt_p50']:.1f}"), ("rtt_p95_ms", f"{agg['rtt_p95']:.1f}"),
+            ("rtt_max_ms", f"{agg['rtt_max']:.1f}"), ("cmd_loss", f"{agg['cmd_loss']:.3f}"),
+            ("safety_hold_s", f"{agg['hold_s']:.2f}"), ("jerk_sum_sq", f"{agg['jerk']:.3g}"),
+            ("sal", f"{agg['sal']:.2f}"), ("ldlj", f"{agg['ldlj']:.2f}"),
+            ("stall_frac", f"{agg['stall_frac']:.2f}"),
+            ("unsafe_events", f"{agg['unsafe']}  ({', '.join(f'{k}={agg['events'].get(k, 0)}' for k in SAFE)})"),
+            ("diagnostics", ", ".join(f"{k}={v}" for k, v in agg["events"].items()
+                                      if k not in SAFE))] + list(extra)
+    return "\n".join(f"{k:<16} {v}" for k, v in rows)
