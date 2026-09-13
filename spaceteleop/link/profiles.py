@@ -46,7 +46,8 @@ def _leo(up_ms, down_ms, **kw):
     ge = dict(p_gb=0.0034, p_bg=0.2, loss=0.0, loss_b=0.3)
     struct = dict(period_s=15.0, spike_dur_s=0.140, end_bump_ms=20.0, end_bump_s=0.075,
                   shift_ms=5.0, burst_frac=0.31, outage_rate_per_h=1.7,
-                  outage_mix=RELAY_MIX, **kw)
+                  outage_mix=RELAY_MIX)
+    struct.update(kw)                       # callers may override any structural field
     return dict(up=_d(up_ms, 14.0, "lognormal", rho=0.25, spike_ms=74.0,
                       bw_bps=625_000, **ge, **struct),
                 down=_d(down_ms, 11.0, "lognormal", rho=0.25, spike_ms=37.0,
@@ -71,6 +72,10 @@ PROFILES = {
     # crosses the 10 s retract, so the arm stows and then resumes ramp-limited.
     "leo_relay_drop1": _leo(30.0, 18.0, drop_at_s=6.0, drop_len_s=1.0),
     "leo_relay_drop12": _leo(30.0, 18.0, drop_at_s=6.0, drop_len_s=12.0),
+    # H04 appendix: outage-rate sensitivity (selection.md 5). 1.7/h is the consumer figure;
+    # a laser-relayed satellite could see more (SYNTHESIS 9 item 1).
+    "leo_relay_out5": _leo(30.0, 18.0, outage_rate_per_h=5.0),
+    "leo_relay_out12": _leo(30.0, 18.0, outage_rate_per_h=12.0),
     # GEO relay: 300 ms each way, TDRS handover LOS 45 s every 45 min
     "geo_relay": dict(
         up=_d(300, 2.0, "gauss", p_gb=0.0091, p_bg=0.2, loss_b=0.3, bw_bps=2_500_000,
