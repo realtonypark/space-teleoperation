@@ -61,12 +61,17 @@ TIER1 = {
 # ("to be re-pointed once the knee is known"), so --arm-map decides which labels exist and
 # unmapped labels are dropped. B is added to every cell: Tier 2 is paired against baseline.
 TIER2 = {
+    # Re-pointed from the post-fix Tier 1 knees (docs/experiments/results.md):
+    # capture knee B 240 / T 471 ms; peg knee B 97 / D 256 / T 510 / G,P never.
     "T": [("capture", "sweep:400"), ("capture", "geo_relay"), ("peg", "sweep:400"),
-          ("capture", "zero")],
-    "D": [("capture", "sweep:250"), ("peg", "leo_relay")],
-    "G": [("capture", "sweep:400"), ("capture", "geo_relay"), ("capture", "zero")],
-    "P": [("peg", "leo_relay"), ("peg", "sweep:400"), ("capture", "sweep:500")],
-    "Pg": [("peg", "leo_relay"), ("peg", "sweep:400"), ("capture", "sweep:500")],
+          ("peg", "sweep:500"), ("capture", "zero")],
+    "D": [("capture", "sweep:250"), ("peg", "leo_relay"), ("peg", "sweep:100"),
+          ("peg", "sweep:250")],
+    "G": [("peg", "sweep:250"), ("peg", "sweep:500"), ("peg", "geo_relay"),
+          ("capture", "sweep:400"), ("capture", "zero"), ("peg", "zero")],
+    "P": [("peg", "leo_relay"), ("peg", "sweep:400"), ("capture", "sweep:500"),
+          ("capture", "leo_relay")],
+    "Pg": [("peg", "leo_relay"), ("peg", "sweep:400")],
     "C": [("capture_chain", "leo_relay"), ("capture_chain", "sweep:500")],
 }
 
