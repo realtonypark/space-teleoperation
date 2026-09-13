@@ -33,6 +33,7 @@ from .link.profiles import PROFILES, get, rtt_ms
 from .metrics import aggregate, episode_metrics, table
 from .record import load_episode, load_sat, write_episode
 from .sat.controller import MAX_FRAME, run_episode as sat_episode
+from .strategies import STRATEGIES, get as get_strategy
 from .strategies.baseline import Baseline
 
 TASKS = {
@@ -48,9 +49,10 @@ def _sock():
     return s
 
 
-def episode(m, d, profile, seed, args, strategy_cls=Baseline):
+def episode(m, d, profile, seed, args, strategy_cls=None):
     """One full episode over real sockets. Returns (rows, ep_summary)."""
     task = getattr(args, "task", "capture")
+    strategy_cls = strategy_cls or get_strategy(getattr(args, "strategy", "baseline"))
     gnd, sat = _sock(), _sock()
     link = Link(get(profile), sat.getsockname(), gnd.getsockname(), seed=seed).start()
     out = {}
@@ -98,6 +100,7 @@ def main(argv=None):
     p.add_argument("--profile", default="zero",
                    help=f"{' | '.join(sorted(PROFILES))} | sweep:<rtt_ms>")
     p.add_argument("--task", default="capture", choices=sorted(TASKS))
+    p.add_argument("--strategy", default="baseline", choices=sorted(STRATEGIES))
     p.add_argument("--list-tasks", action="store_true", help="print the task set and exit")
     p.add_argument("--arms", type=int, default=1, help="independent concurrent triplets")
     p.add_argument("--episodes", type=int, default=3, help="episodes PER ARM")
