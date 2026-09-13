@@ -9,3 +9,6 @@ dependencies = [
     "robot-descriptions>=3.2.0",
     "sgp4>=2.27",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
