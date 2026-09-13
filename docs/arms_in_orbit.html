@@ -1,0 +1,167 @@
+<title>Arms in Orbit</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#F5F6F3;--paper2:#EBEDE8;--ink:#171A1F;--ink2:#3C424B;--muted:#6F7681;--grid:#D5D9D2;
+  --accent:#DD5A20;--blue:#2A5DB0;--green:#2E8F63;--violet:#7E56C2;--bad:#B93A3A;
+  --band:rgba(23,26,31,.08);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#10141A;--paper2:#171C24;--ink:#E8EAE6;--ink2:#C4C9D0;--muted:#98A1AC;--grid:#2B323C;
+  --accent:#F0793E;--blue:#6E9DF2;--green:#4CBB8A;--violet:#A98BE0;--bad:#E06B6B;--band:rgba(232,234,230,.10);}}
+:root[data-theme="dark"]{
+  --paper:#10141A;--paper2:#171C24;--ink:#E8EAE6;--ink2:#C4C9D0;--muted:#98A1AC;--grid:#2B323C;
+  --accent:#F0793E;--blue:#6E9DF2;--green:#4CBB8A;--violet:#A98BE0;--bad:#E06B6B;--band:rgba(232,234,230,.10);}
+body{background:var(--paper);color:var(--ink);font:16px/1.55 "IBM Plex Sans",system-ui,sans-serif;margin:0}
+.wrap{max-width:76ch;margin:0 auto;padding:48px 24px 80px}
+.wide{max-width:1120px;margin:0 auto;padding:0 24px}
+h1,h2,h3{font-family:"Instrument Serif",Georgia,serif;font-weight:400;text-wrap:balance;margin:0}
+h1{font-size:clamp(44px,7vw,72px);line-height:1;letter-spacing:-.01em}
+h2{font-size:34px;line-height:1.1;margin:56px 0 14px}
+h3{font-size:22px;margin:28px 0 8px}
+p{margin:0 0 14px;max-width:68ch}
+.eyebrow{font:500 12px/1 "IBM Plex Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.lede{font-size:20px;color:var(--ink2);margin:20px 0 0;max-width:60ch}
+.verdict{border-top:2px solid var(--ink);border-bottom:1px solid var(--grid);padding:22px 0;margin:36px 0 8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px}
+.verdict .k{font:500 12px/1 "IBM Plex Mono",monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.verdict .v{font-family:"Instrument Serif",Georgia,serif;font-size:40px;line-height:1;font-variant-numeric:tabular-nums}
+.verdict .s{font-size:13px;color:var(--ink2);margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums;margin:12px 0 24px}
+th{font:500 12px/1.3 "IBM Plex Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--ink)}
+td{padding:8px 10px 8px 0;border-bottom:1px solid var(--grid);vertical-align:top}
+td.n,th.n{text-align:right;padding-right:0}
+.tscroll{overflow-x:auto}
+code,.mono{font-family:"IBM Plex Mono",monospace;font-size:13.5px}
+pre{background:var(--paper2);padding:16px 18px;overflow-x:auto;font:13px/1.45 "IBM Plex Mono",monospace;margin:12px 0 22px;border-left:3px solid var(--accent)}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin:20px 0 8px}
+@media (max-width:820px){.charts{grid-template-columns:1fr}.verdict{grid-template-columns:1fr}}
+.chart h3{margin:0 0 6px;font-size:20px}
+.chart .sub{font-size:13px;color:var(--muted);margin:0 0 8px}
+svg{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font:13px "IBM Plex Sans",sans-serif;color:var(--ink2);margin:6px 0 0}
+.legend span::before{content:"";display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:7px;background:currentColor}
+.legend .b{color:var(--ink)}.legend .t{color:var(--accent)}.legend .p{color:var(--blue)}.legend .g{color:var(--violet)}.legend .d{color:var(--green)}.legend .pg{color:var(--muted)}
+.pill{display:inline-block;font:500 11px/1 "IBM Plex Mono",monospace;letter-spacing:.06em;padding:4px 7px;border:1px solid currentColor;border-radius:3px;text-transform:uppercase}
+.ok{color:var(--green)}.no{color:var(--bad)}.part{color:var(--accent)}
+.budget{margin:10px 0 24px}
+.bar{display:flex;height:34px;border:1px solid var(--grid);overflow:hidden}
+.bar div{height:100%;font:11px/34px "IBM Plex Mono",monospace;text-align:center;color:var(--paper);overflow:hidden;white-space:nowrap}
+.bar .h{background:var(--ink2)}.bar .l{background:var(--accent)}.bar .m{background:var(--blue)}.bar .sat{background:var(--violet)}.bar .v{background:var(--muted)}
+.bkey{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--ink2);margin-top:8px}
+.bkey i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px}
+ul{padding-left:20px;margin:0 0 14px}li{margin-bottom:6px}
+.foot{border-top:1px solid var(--grid);margin-top:56px;padding-top:18px;font-size:13px;color:var(--muted)}
+a{color:var(--blue)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.note{font-size:13.5px;color:var(--ink2);border-left:3px solid var(--grid);padding-left:14px;margin:10px 0 18px}
+</style>
+
+<div class="wrap">
+<div class="eyebrow">Research program · 2026-09-12 to 2026-09-13 · autonomous agent fleet</div>
+<h1>Arms in Orbit</h1>
+<p class="lede">Can people on Earth teleoperate simple robot arms inside a rideshare-class satellite well enough to collect physical-AI demonstrations that no Earth-side simulation or lab can produce? A research fleet answered with literature, a socket-level testbed, 20 hypotheses, 9,700 emulated episodes, two adversarial audits and an independent reproduction.</p>
+
+<div class="verdict">
+  <div><div class="k">Verdict</div><div class="v">Conditional yes</div><div class="s">Feasible with hardware buyable in 2026, on a Starlink mini-laser relay whose first third-party flights are Q1 2027, or pass-limited at 21 % duty on four polar ground stations.</div></div>
+  <div><div class="k">Relay round trip, emulated</div><div class="v">42 ms</div><div class="s">p50 measured on the relay profile (48 ms nominal, p95 68 ms), plus a 15 s spike to about 125 ms and 1.7 outages per hour. Every arm passes the 80 % acceptance gate here.</div></div>
+  <div><div class="k">Link-caused unsafe motion</div><div class="v">0</div><div class="s">Across 9,700 episodes on every profile, including forced 1 s and 12 s blackouts that exercised hold and retract 30 times each per arm.</div></div>
+</div>
+
+<h2>What the numbers say</h2>
+<p>The satellite never runs a model. It plays a 50 Hz stream of joint setpoints through a 30 ms buffer, holds after 300 ms of silence and stows after 10 s. On the relay link that baseline already meets the acceptance criterion for both tasks. Latency only starts to bite past the relay: coarse capture of a drifting box degrades from about 250 ms round trip, and 6 mm-clearance peg insertion from about 100 ms.</p>
+</div>
+
+<div class="wide">
+<div class="charts">
+  <div class="chart"><h3>Capture a drifting, tumbling box</h3><p class="sub">Success vs nominal RTT · 30 seeds per point · shaded band is the baseline's 95 % Wilson CI</p><svg id="c1" viewBox="0 0 520 320" role="img" aria-label="Capture success versus round-trip time for six strategies"></svg></div>
+  <div class="chart"><h3>Insert a peg, 6 mm clearance</h3><p class="sub">Same axes · the onboard terminal primitive never fails; the ground copy of it fails from 100 ms</p><svg id="c2" viewBox="0 0 520 320" role="img" aria-label="Peg insertion success versus round-trip time for six strategies"></svg></div>
+</div>
+<div class="legend"><span class="b">Baseline</span><span class="t">Twin (ground prediction)</span><span class="p">Terminal (onboard grasp primitive)</span><span class="pg">Terminal, ground ablation</span><span class="d">DeadReckon (satellite extrapolation)</span><span class="g">Gain (RTT-scaled speed)</span></div>
+<p class="note" style="max-width:100ch;margin-top:14px">Dashed vertical: the relay profile at 48 ms. Dotted horizontal: 80 % of each task's zero-latency success, the acceptance line. Zero-latency capture tops out near 0.67 because 7 of 30 spawn seeds drift out of reach before any operator could catch them; every arm shares those seeds.</p>
+</div>
+
+<div class="wrap">
+<h2>Five hypotheses, head to head</h2>
+<p>Twenty hypothesis agents were given one axis and one angle each and told to abstain rather than pad. Seven abstained with measured arguments. Five verifier agents scored the rest, a selection agent merged near-duplicates, and five strategies went into a paired 100-seed confirmation against the baseline. Each is judged by the reject criterion its own author wrote.</p>
+<div class="tscroll"><table>
+<tr><th>Strategy</th><th>Mechanism</th><th>Decisive cell (100 paired seeds)</th><th class="n">Δ success</th><th class="n">McNemar p</th><th>Verdict</th></tr>
+<tr><td><b>Twin</b> (H10)</td><td>Operator acts on a ground-side prediction: the arm as the setpoints already in flight at now − 170 ms, the object dead-reckoned over the link delay.</td><td>capture, 400 ms · capture, GEO 600 ms</td><td class="n">+0.28 · +0.38</td><td class="n">&lt;10⁻⁴</td><td><span class="pill ok">Confirmed</span><br><small>Knee 250 → 787 ms. Null at zero latency, as required.</small></td></tr>
+<tr><td><b>Terminal</b> (H11, onboard-compute branch)</td><td>When the operator commands the jaw closed within 8 cm, the satellite closes the last segment with a local zero-latency servo, bounded to 2 s.</td><td>peg, 400 ms · capture, 500 ms</td><td class="n">+0.99 · +0.17</td><td class="n">&lt;10⁻⁴ · 0.0009</td><td><span class="pill ok">Confirmed</span><br><small>Insertion 1 → 100 %. The ground-side ablation scores 0 %: the entire gain is onboard compute.</small></td></tr>
+<tr><td><b>DeadReckon</b> (H12)</td><td>Satellite extrapolates the command stream 60 ms ahead along a least-squares line in sequence time; freezes past 100 ms of silence.</td><td>peg, 250 ms · capture, 250 ms</td><td class="n">+0.77 · +0.05</td><td class="n">&lt;10⁻⁴ · 0.27</td><td><span class="pill part">Partial</span><br><small>Rescues insertion up to its horizon, then collapses at 400 ms. No effect on capture. Fits the rad-tolerant supervisor.</small></td></tr>
+<tr><td><b>Gain</b> (H14)</td><td>Ground scales the operator's speed by measured loop delay so the overshoot-and-chase instability never starts.</td><td>peg, 250 ms · capture, 400 ms</td><td class="n">+0.84 · −0.41</td><td class="n">&lt;10⁻⁴ · &lt;10⁻⁴</td><td><span class="pill part">Task-dependent</span><br><small>Holds insertion at 93 % out to 1000 ms; makes capture impossible because the slowed arm cannot catch a 2 to 5 cm/s box. Rejected as default-on by its own clause (ii).</small></td></tr>
+<tr><td><b>Chained release</b> (H20)</td><td>Each demonstration ends by re-releasing the object toward the next target, so no teleoperated reset is needed.</td><td>capture_chain, relay, 30 seeds</td><td class="n">gross demos/h 473 vs 390</td><td class="n">—</td><td><span class="pill ok">Confirmed</span><br><small>Reset wall time 1.8 s vs 5.1 s; +21 % gross throughput, success unchanged at 100 %.</small></td></tr>
+</table></div>
+
+<h2>Where the latency actually goes</h2>
+<p>On the relay path the human is half the loop. The link both ways is 14 %. Attacking the link alone can never move the knee much; attacking what the operator sees (Twin) or what the satellite finishes on its own (Terminal) can.</p>
+<div class="budget">
+  <div class="bar" aria-label="Latency budget, 333 ms total">
+    <div class="v" style="width:16.5%">video 55</div><div class="l" style="width:5.4%">18</div><div class="h" style="width:51%">human 170</div><div class="v" style="width:3.6%">12</div><div class="l" style="width:9%">30</div><div class="sat" style="width:9%">sat 30</div><div class="v" style="width:2.4%">8</div><div class="m" style="width:3%"></div>
+  </div>
+  <div class="bkey"><span><i style="background:var(--muted)"></i>sensor, encode, jitter buffer, decode, display, input, actuation</span><span><i style="background:var(--accent)"></i>relay link down 18 ms, up 30 ms</span><span><i style="background:var(--ink2)"></i>human visuomotor correction 170 ms</span><span><i style="background:var(--violet)"></i>satellite playout buffer 30 ms</span></div>
+  <p class="note">Sum 333 ms; machine loop without the human 163 ms. Sources: SYNTHESIS §8 from the hardware, bandwidth and fundamentals reports.</p>
+</div>
+
+<h2>The recommended architecture</h2>
+<pre>
+ OPERATORS (4)             GROUND                     SPACE  (ESPA-class bus, 1 atm cylinder, 4 arms)
+ leader-follower / VR  →  session broker  ─┐        ┌─ 2× Starlink mini-laser terminals  (primary, 48 ms)
+ no force feedback        1 writer / arm   ├─ UDP ──┤   X-band down + S-band up            (fallback, passes)
+ 50 Hz setpoints, 40 B    observers fan out│  50 Hz  │   IDRS / Iridium L-band              (safety heartbeat)
+ twin view (Twin)         LeRobot v2.1 log ┘        └─ SUPERVISOR MCU (rad-tolerant):  30 ms playout · hold 300 ms
+                                                        retract 10 s · ramp-limited resume · joint/keep-out clamps
+                                                        optional: terminal-grasp primitive (needs Jetson pose)
+                                                      JETSON ORIN NX: 4–8 global-shutter cams, NVENC 720p30,
+                                                        ~1 Mb/s per live stream, 10.4 Mb/s down for 4 operators
+</pre>
+<ul>
+<li><b>Link.</b> Two Starlink mini-laser terminals as primary; a four-site polar network as fallback and commissioning path; L-band as the safety channel. GEO relay is disqualified by its 474 ms propagation floor.</li>
+<li><b>Protocol.</b> Timestamped, sequence-keyed joint setpoints at 50 Hz, sent twice, played out through a fixed 30 ms buffer. Loss on the relay (1.1 %) is irrelevant to a self-healing setpoint stream; three transport hypotheses abstained after computing exactly that.</li>
+<li><b>Satellite.</b> Decision (c): hold, retract, ramp, static envelopes and hardware cutoffs on a deterministic supervisor. No vision or models in the baseline. The onboard terminal primitive is the one addition the evidence justifies, and it costs a Jetson pose estimator.</li>
+<li><b>Ground.</b> Leader-follower or VR without force feedback, one write authority per arm, the twin view as the default operator display, chained-release task design to remove resets.</li>
+<li><b>Mission.</b> Pressurised ESPA-class bus (Apex Aries class, 100 kg), a 100 to 300 L aluminium cylinder at 1 atm, four Dynamixel-class arms with granular and liquid cells, order of $6 to 12 M including launch. A 16U pass-only variant carries two arms and no relay.</li>
+</ul>
+
+<h2>What the data buys</h2>
+<p>Four tasks expose behaviour no simulator validates and no Earth analog sustains beyond 24 s of free fall: scooping and pouring sieved granular simulant, capturing a truly free 6-DoF tumbling body, capillary pours between vessels, and routing cable and fabric in microgravity. All four are slow by nature, which is the largest latency hider available, and all four fit a 6-DoF arm with a parallel gripper inside a pressurised cell.</p>
+
+<h2>How much to trust this</h2>
+<div class="tscroll"><table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td>Test suite on a clean clone</td><td>78 passed</td></tr>
+<tr><td>Independent re-run of two headline cells, 12 seeds each</td><td>48 of 48 per-seed outcomes identical to the Tier 2 vectors</td></tr>
+<tr><td>Adversarial audits before the canonical run</td><td>20 testbed findings and 13 strategy findings; the critical ones (capture keyed on the jaw command, dropout path never exercised, RTT stamped 10 ms late) were fixed and the whole matrix re-run</td></tr>
+<tr><td>Contamination from CPU load</td><td>0 stalled cells in the canonical run (12 in the discarded pre-fix run)</td></tr>
+<tr><td>Zero-latency control cells for Twin and Gain</td><td>Paired difference CI includes zero, so neither strategy gains against the operator model</td></tr>
+</table></div>
+<p><b>What it does not prove.</b> Video is modelled as delay plus bytes, not a codec. The grasp is kinematic once the physical jaw closes on the box. The operator is a synthetic pursuit controller with a 170 ms reaction delay, not a person. Everything runs in real time on one machine. No third-party satellite has published a latency over Starlink lasers, no radiation data exists for the hobby servos, and no policy has been trained on latency-collected demonstrations to see whether it is worse. Those are the flight questions.</p>
+
+<h2>Read the full record</h2>
+<p>Repository <code>~/exp/teleoperation</code>, branch <code>main</code>. The report is <code>docs/REPORT.md</code>; the decision record is <code>docs/research/SYNTHESIS.md</code>; results live under <code>docs/experiments/</code> (tier1, tier2, audits, final_verification, geometry, scaling, outage sweep). Reproduce with <code>uv sync</code>, <code>uv run pytest -q</code>, then <code>experiments/matrix.py</code> and <code>experiments/aggregate.py</code>.</p>
+<div class="foot">Eight research agents, one synthesis agent, twenty hypothesis agents, five verifiers, one selection agent, four builders, two auditors, one reviewer, one geometry agent, one verifier, one report writer. Fable 5.1 for research and verification, Opus 5 for implementation. No human in the loop between the brief and this page.</div>
+</div>
+
+<script>
+const DATA = {"capture": {"baseline": [[0,0.667,0.488,0.808],[100,0.667,0.488,0.808],[250,0.533,0.361,0.698],[400,0.367,0.219,0.545],[500,0.333,0.192,0.512],[750,0.267,0.142,0.444],[1000,0.167,0.073,0.336]],"deadreckon": [[0,0.7,0.521,0.833],[100,0.733,0.556,0.858],[250,0.533,0.361,0.698],[400,0.4,0.246,0.577],[500,0.4,0.246,0.577],[750,0.233,0.118,0.409],[1000,0.2,0.095,0.373]],"gain": [[0,0.767,0.591,0.882],[100,0.6,0.423,0.754],[250,0.267,0.142,0.444],[400,0.033,0.006,0.167],[500,0.1,0.035,0.256],[750,0,0,0.114],[1000,0,0,0.114]],"terminal": [[0,0.667,0.488,0.808],[100,0.733,0.556,0.858],[250,0.6,0.423,0.754],[400,0.433,0.274,0.608],[500,0.433,0.274,0.608],[750,0.333,0.192,0.512],[1000,0.333,0.192,0.512]],"terminal_ground": [[0,0.633,0.455,0.781],[100,0.7,0.521,0.833],[250,0.533,0.361,0.698],[400,0.3,0.167,0.479],[500,0.333,0.192,0.512],[750,0.133,0.053,0.297],[1000,0.167,0.073,0.336]],"twin": [[0,0.767,0.591,0.882],[100,0.733,0.556,0.858],[250,0.733,0.556,0.858],[400,0.667,0.488,0.808],[500,0.667,0.488,0.808],[750,0.633,0.455,0.781],[1000,0.5,0.332,0.668]]},
+"peg": {"baseline": [[0,0.967,0.833,0.994],[100,0.767,0.591,0.882],[250,0.167,0.073,0.336],[400,0,0,0.114],[500,0,0,0.114],[750,0,0,0.114],[1000,0,0,0.114]],"deadreckon": [[0,1,0.886,1],[100,0.967,0.833,0.994],[250,0.833,0.664,0.927],[400,0,0,0.114],[500,0,0,0.114],[750,0,0,0.114],[1000,0,0,0.114]],"gain": [[0,0.967,0.833,0.994],[100,0.967,0.833,0.994],[250,0.933,0.787,0.982],[400,0.933,0.787,0.982],[500,0.933,0.787,0.982],[750,0.967,0.833,0.994],[1000,0.933,0.787,0.982]],"terminal": [[0,1,0.886,1],[100,1,0.886,1],[250,1,0.886,1],[400,1,0.886,1],[500,1,0.886,1],[750,1,0.886,1],[1000,1,0.886,1]],"terminal_ground": [[0,0.967,0.833,0.994],[100,0,0,0.114],[250,0.033,0.006,0.167],[400,0,0,0.114],[500,0,0,0.114],[750,0,0,0.114],[1000,0,0,0.114]],"twin": [[0,1,0.886,1],[100,1,0.886,1],[250,0.967,0.833,0.994],[400,0.967,0.833,0.994],[500,0.833,0.664,0.927],[750,0,0,0.114],[1000,0,0,0.114]]}};
+const STYLE = {baseline:["var(--ink)",2.4,""],twin:["var(--accent)",2.4,""],terminal:["var(--blue)",2.4,""],terminal_ground:["var(--muted)",1.6,"5 4"],deadreckon:["var(--green)",1.8,""],gain:["var(--violet)",1.8,""]};
+function draw(id, task){
+  const s=document.getElementById(id), W=520,H=320,L=44,R=14,T=14,B=40;
+  const x=v=>L+(W-L-R)*v/1000, y=v=>T+(H-T-B)*(1-v);
+  const ns="http://www.w3.org/2000/svg", el=(n,a,txt)=>{const e=document.createElementNS(ns,n);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;s.appendChild(e);return e};
+  for(const v of [0,.25,.5,.75,1]){el("line",{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:"var(--grid)","stroke-width":1});el("text",{x:L-8,y:y(v)+4,"text-anchor":"end","font-size":11,"font-family":"IBM Plex Mono, monospace",fill:"var(--muted)"},v.toFixed(2))}
+  for(const v of [0,250,500,750,1000]){el("text",{x:x(v),y:H-B+18,"text-anchor":"middle","font-size":11,"font-family":"IBM Plex Mono, monospace",fill:"var(--muted)"},v)}
+  el("text",{x:(L+W-R)/2,y:H-6,"text-anchor":"middle","font-size":11,"font-family":"IBM Plex Mono, monospace",fill:"var(--muted)"},"round-trip time, ms");
+  el("line",{x1:L,x2:L,y1:T,y2:H-B,stroke:"var(--grid)"});
+  const d=DATA[task], base=d.baseline;
+  el("path",{d:base.map((p,i)=>(i?"L":"M")+x(p[0])+" "+y(p[3])).join(" ")+" "+[...base].reverse().map(p=>"L"+x(p[0])+" "+y(p[2])).join(" ")+" Z",fill:"var(--band)",stroke:"none"});
+  const thr=0.8*base[0][1];
+  el("line",{x1:L,x2:W-R,y1:y(thr),y2:y(thr),stroke:"var(--ink2)","stroke-dasharray":"2 4","stroke-width":1});
+  el("line",{x1:x(48),x2:x(48),y1:T,y2:H-B,stroke:"var(--accent)","stroke-dasharray":"4 4","stroke-width":1});
+  el("text",{x:x(48)+5,y:T+12,"font-size":11,"font-family":"IBM Plex Mono, monospace",fill:"var(--accent)"},"relay 48");
+  for(const k of ["terminal_ground","gain","deadreckon","terminal","twin","baseline"]){const [c,w,da]=STYLE[k];
+    el("path",{d:d[k].map((p,i)=>(i?"L":"M")+x(p[0])+" "+y(p[1])).join(" "),fill:"none",stroke:c,"stroke-width":w,"stroke-dasharray":da,"stroke-linejoin":"round"});
+    for(const p of d[k]) el("circle",{cx:x(p[0]),cy:y(p[1]),r:2.6,fill:c});}
+}
+draw("c1","capture"); draw("c2","peg");
+</script>
