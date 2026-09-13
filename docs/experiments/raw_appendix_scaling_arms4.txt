@@ -1,0 +1,95 @@
+arm 0 ep 0 seed 0 success=True 8.8s rtt_p50=40ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.01s frames=434
+arm 3 ep 0 seed 3000 success=True 9.5s rtt_p50=44ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=469
+arm 0 ep 1 seed 1 success=True 7.7s rtt_p50=43ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=381
+arm 1 ep 0 seed 1000 success=False 20.0s rtt_p50=47ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.01s frames=994
+arm 2 ep 0 seed 2000 success=False 20.0s rtt_p50=43ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.01s frames=995
+arm 0 ep 2 seed 2 success=True 7.8s rtt_p50=37ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=384
+arm 3 ep 1 seed 3001 success=False 20.0s rtt_p50=36ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.04s frames=994
+arm 2 ep 1 seed 2001 success=True 11.1s rtt_p50=41ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.02s frames=546
+arm 1 ep 1 seed 1001 success=False 20.0s rtt_p50=39ms hold=0.00s unsafe=0 cage=2 stalls=0 max_dt=0.08s frames=991
+arm 0 ep 3 seed 3 success=True 14.7s rtt_p50=43ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.08s frames=728
+arm 1 ep 2 seed 1002 success=True 8.0s rtt_p50=43ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=396
+arm 3 ep 2 seed 3002 success=False 20.0s rtt_p50=39ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.08s frames=992
+arm 2 ep 2 seed 2002 success=False 20.0s rtt_p50=39ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.08s frames=991
+arm 3 ep 3 seed 3003 success=True 6.3s rtt_p50=42ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.02s frames=307
+arm 1 ep 3 seed 1003 success=True 8.2s rtt_p50=44ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.06s frames=401
+arm 2 ep 3 seed 2003 success=True 5.6s rtt_p50=44ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=272
+arm 0 ep 4 seed 4 success=False 20.0s rtt_p50=45ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.06s frames=992
+arm 1 ep 4 seed 1004 success=True 7.5s rtt_p50=46ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.02s frames=369
+arm 3 ep 4 seed 3004 success=True 8.1s rtt_p50=47ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.02s frames=398
+arm 2 ep 4 seed 2004 success=True 14.2s rtt_p50=37ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.04s frames=702
+arm 1 ep 5 seed 1005 success=True 7.1s rtt_p50=39ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=348
+arm 2 ep 5 seed 2005 success=True 7.3s rtt_p50=48ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=358
+arm 0 ep 5 seed 5 success=False 20.0s rtt_p50=45ms hold=0.00s unsafe=0 cage=2 stalls=0 max_dt=0.04s frames=994
+arm 1 ep 6 seed 1006 success=True 11.3s rtt_p50=40ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.06s frames=558
+arm 3 ep 5 seed 3005 success=False 20.0s rtt_p50=40ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.07s frames=990
+arm 2 ep 6 seed 2006 success=True 6.4s rtt_p50=41ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.07s frames=308
+arm 0 ep 6 seed 6 success=True 6.1s rtt_p50=40ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.06s frames=295
+arm 0 ep 7 seed 7 success=True 5.7s rtt_p50=47ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=276
+arm 1 ep 7 seed 1007 success=True 9.9s rtt_p50=41ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.02s frames=490
+arm 3 ep 6 seed 3006 success=True 10.1s rtt_p50=43ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=498
+arm 2 ep 7 seed 2007 success=True 9.7s rtt_p50=47ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.01s frames=476
+arm 0 ep 8 seed 8 success=True 7.3s rtt_p50=45ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=358
+arm 3 ep 7 seed 3007 success=True 8.8s rtt_p50=40ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=433
+arm 2 ep 8 seed 2008 success=True 8.0s rtt_p50=45ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=395
+arm 1 ep 8 seed 1008 success=False 20.0s rtt_p50=45ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.05s frames=992
+arm 2 ep 9 seed 2009 success=True 11.5s rtt_p50=46ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.05s frames=570
+arm 3 ep 8 seed 3008 success=True 14.3s rtt_p50=44ms hold=0.00s unsafe=0 cage=2 stalls=0 max_dt=0.05s frames=708
+arm 0 ep 9 seed 9 success=False 20.0s rtt_p50=42ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.05s frames=993
+arm 1 ep 9 seed 1009 success=True 7.6s rtt_p50=34ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=373
+arm 2 ep 10 seed 2010 success=True 7.1s rtt_p50=45ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=349
+arm 3 ep 9 seed 3009 success=True 6.1s rtt_p50=40ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=295
+arm 1 ep 10 seed 1010 success=True 8.8s rtt_p50=39ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=434
+arm 2 ep 11 seed 2011 success=True 8.8s rtt_p50=40ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=432
+arm 1 ep 11 seed 1011 success=True 5.6s rtt_p50=36ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=270
+arm 0 ep 10 seed 10 success=False 20.0s rtt_p50=46ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=992
+arm 2 ep 12 seed 2012 success=True 9.7s rtt_p50=45ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.02s frames=478
+arm 3 ep 10 seed 3010 success=False 20.0s rtt_p50=43ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.04s frames=993
+arm 1 ep 12 seed 1012 success=True 8.9s rtt_p50=43ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=436
+arm 0 ep 11 seed 11 success=True 8.6s rtt_p50=36ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=422
+arm 3 ep 11 seed 3011 success=True 6.8s rtt_p50=45ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=335
+arm 2 ep 13 seed 2013 success=True 9.2s rtt_p50=44ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=452
+arm 0 ep 12 seed 12 success=True 5.7s rtt_p50=41ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=279
+arm 3 ep 12 seed 3012 success=True 6.6s rtt_p50=46ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=323
+arm 1 ep 13 seed 1013 success=False 20.0s rtt_p50=39ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=994
+arm 2 ep 14 seed 2014 success=True 14.1s rtt_p50=41ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.03s frames=695
+arm 3 ep 13 seed 3013 success=True 8.8s rtt_p50=40ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.04s frames=430
+arm 0 ep 13 seed 13 success=False 20.0s rtt_p50=47ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.04s frames=995
+arm 1 ep 14 seed 1014 success=True 8.7s rtt_p50=46ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=426
+arm 3 ep 14 seed 3014 success=True 8.6s rtt_p50=47ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=421
+arm 0 ep 14 seed 14 success=True 8.1s rtt_p50=43ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=400
+
+arm 0: success_rate 0.67  demos_per_hour 446.9  unsafe 0  rtt_p50 43 ms
+arm 1: success_rate 0.73  demos_per_hour 432.5  unsafe 0  rtt_p50 41 ms
+arm 2: success_rate 0.87  demos_per_hour 382.0  unsafe 0  rtt_p50 43 ms
+arm 3: success_rate 0.73  demos_per_hour 421.2  unsafe 0  rtt_p50 42 ms
+
+profile          leo_relay
+episodes         60
+success_rate     0.75
+mean_duration_s  8.64
+demos_per_hour   416.8
+demos_per_h_gross 235.2
+rtt_p50_ms       42.4
+rtt_p95_ms       68.1
+rtt_max_ms       190.3
+cmd_loss         0.103
+safety_hold_s    0.00
+jerk_sum_sq      1.42e+11
+sal              -4.37
+ldlj             -19.15
+stall_frac       0.04
+unsafe_events    0  (move_in_hold=0, vel_over=0, keepout=0)
+cage             21
+stalls           0
+max_dt_s         0.084
+diagnostics      cage=21, hold=0, jams=0, knockaway=61, pos_clamp=21449, ramp_clip=51800, retract=0, stale=3174, taut_frac=0.0
+task             capture
+strategy         baseline
+arms             4
+reset_mode       free
+R_s              nan (n=0)
+wire_up_Bps      8,034
+wire_down_Bps    999,090
+nominal_rtt_ms   48
+written          docs/experiments/raw_appendix/scaling_arms4
