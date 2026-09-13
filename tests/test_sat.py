@@ -6,7 +6,7 @@ import time
 import numpy as np
 
 from spaceteleop import sim
-from spaceteleop.proto import F_SAFETY_HOLD, pack_cmd, unpack_tel
+from spaceteleop.proto import F_ASSIST, F_SAFETY_HOLD, pack_cmd, unpack_tel
 from spaceteleop.sat.controller import run_episode
 from spaceteleop.strategies.baseline import Baseline
 
@@ -83,6 +83,26 @@ def test_retract_after_long_silence_is_ramped():
     sp = np.array([r[4] for r in log])[:, :6]
     v = np.abs(np.diff(sp, axis=0)).max(1) / np.diff(t)
     assert v.max() <= Baseline.vmax * 1.05, v.max()               # never a jump
+
+
+def test_ground_side_assist_flag_reaches_the_sidecar():
+    """F8: for Pg the primitive runs on the GROUND, so the satellite's own strategy never
+    sets `assist` and the recorded mask was all-False for every Pg episode. The flag now
+    rides up on the command and the controller ORs it in, so P and Pg record the same
+    thing."""
+    def feed(addr):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        for i in range(30):
+            s.sendto(pack_cmd(i, time.monotonic_ns(), TARGET, F_ASSIST if i > 14 else 0),
+                     addr)
+            time.sleep(0.02)
+
+    _, out, tels = _run(Baseline(), feed, max_s=4.0)
+    assist = [r[5] for r in out["satlog"]]
+    assert any(assist) and not all(assist)
+    assert not any(assist[:100]), "assist before the flag was ever sent"
+    assert assist[-1], "the flag never reached the log"
+    assert any(t["flags"] & F_ASSIST for t in tels)      # and it is echoed in telemetry
 
 
 def test_playout_is_keyed_on_sequence_not_arrival():

@@ -3,7 +3,8 @@
 `capture` (task 2): a free-floating box drifting at 2-5 cm/s and tumbling at up to 1 rad/s.
 Grasp it inside a jaw-scale envelope and hold it in the target region. The operator only
 ever sees where the box WAS, so the steady-state chase error is (box speed x loop delay);
-at GRASP_TOL = 20 mm that error decides the episode, which is the whole point.
+at GRASP_TOL = 25 mm that error decides the episode, which is the whole point. Capture needs
+the jaw to be physically shut on the box, not merely commanded shut (see JAW_GRASP).
 
 `capture_chain` (H20): `capture` plus a dead-band tether on the box and two targets. The
 demonstration ends with a re-release that seeds the next one (targets alternate A->B->A),
@@ -42,7 +43,19 @@ CAGE_LO = np.array([-0.32, -0.44, -0.04])
 CAGE_HI = np.array([0.32, 0.22, 0.44])
 
 # --- capture ---
-GRASP_TOL = 0.020           # m, box centre to grasp site (jaw-scale capture envelope)
+GRASP_TOL = 0.025           # m, box centre to grasp site (jaw-scale capture envelope).
+# Was 0.020; raised once capture started requiring the PHYSICAL jaw (below), which costs the
+# 0.6 s the jaw needs to ramp shut. Measured zero-latency baseline over 30 seeds: 21/30 on
+# the old command-only predicate, 16/30 with the physical jaw at 20 mm, 18/30 at >= 24 mm
+# (it saturates there: the rest of the failures are the T16 reachability seeds, not the
+# envelope). Nothing about the operator was touched; `close_at` (18 mm) is unchanged.
+# Capture needs the PHYSICAL jaw closed, not the close COMMAND (audit T01): the jaw takes
+# ~0.6 s to travel JAW_OPEN -> JAW_CLOSED under the 2 rad/s ramp, and a box that drifts out
+# of the pads in that window was never grasped. JAW_GRASP is model-derived: it is the jaw
+# angle at which the pad gap equals the box's diagonal (2*BOX*sqrt(2) = 22.6 mm), i.e. the
+# box can no longer pass back out between the pads. tests/test_sim_operator.py re-derives it
+# from the MJCF; the commanded JAW_CLOSED settles at a 17.8 mm gap, well inside it.
+JAW_GRASP = 0.062           # rad
 TARGET_POS = np.array([0.16, -0.16, 0.22])
 TARGET_R = 0.05
 HOLD_S = 0.2                # must stay in the target region this long
@@ -259,7 +272,11 @@ def step(m, d, ctrl, st, t):
     i, a, v = st["ids"], st["ids"]["qadr"], st["ids"]["vadr"]
     gp = d.site_xpos[i["site"]]
     _edge(st, "out", bool(np.any(gp < CAGE_LO) or np.any(gp > CAGE_HI)), t)
-    # the free object bouncing off a wall is not an unsafe MOTION event; the arm is
+    # the free object bouncing off a wall is not an unsafe MOTION event; the arm is.
+    # `cage_hits` is OPERATOR/TASK-caused, not link-caused: the box spawns 10-16 cm from the
+    # -y wall and drifts, so the chase runs the arm into the wall at ZERO latency too (audit
+    # T07: 12/30 zero-latency episodes). It is reported as its own column, never summed into
+    # the link-caused counters (move_in_hold, vel_over, keepout).
     _edge(st, "hit", _touching(d, i["cage"], but=i["objg"]), t)
     (_peg if st["task"] == "peg" else _capture)(m, d, st, gp, t)
     # chained: the demonstration is over at the RE-release, not at the grasp, because the
@@ -270,6 +287,7 @@ def step(m, d, ctrl, st, t):
 def _capture(m, d, st, gp, t):
     a, v = st["ids"]["qadr"], st["ids"]["vadr"]
     closing = d.ctrl[JAW] < 0.5 * JAW_OPEN
+    shut = closing and d.qpos[JAW] < JAW_GRASP          # the jaw itself, not the command
     if st["grasped"]:
         if not closing:
             st["grasped"] = False
@@ -280,7 +298,7 @@ def _capture(m, d, st, gp, t):
             d.qpos[a:a + 3] = gp + st["off"]
             d.qvel[v:v + 6] = 0
             mujoco.mj_forward(m, d)
-    elif closing and np.linalg.norm(d.qpos[a:a + 3] - gp) < GRASP_TOL:
+    elif shut and np.linalg.norm(d.qpos[a:a + 3] - gp) < GRASP_TOL:
         st["grasped"], st["off"] = True, d.qpos[a:a + 3] - gp   # reel the offset in
     # H14 mechanism check: the arm swept through the box and sent it off. "Faster than
     # 3 cm/s while ungrasped" alone would fire on an untouched box in half the episodes,

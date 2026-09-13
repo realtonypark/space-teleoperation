@@ -26,19 +26,25 @@ def _one(tmp_path, profile, seed=0):
     assert ep["observation.state"].shape[1] == 7 and ep["next.done"][-1]
     assert sat is not None and len(sat["setpoint"]) > 500 and sat["setpoint"].shape[1] == 7
     assert (sat["cmd_seq"][1:] >= sat["cmd_seq"][:-1]).all()  # seq-keyed playout, never back
-    em = episode_metrics(ep, s["success"], wall, s["cmds_sent"], s["cmds_rx"],
+    # T09: run.py charges the episode from its start to the done instant, not to the end
+    # of the 1 s satellite linger plus the thread join plus the npz write
+    em = episode_metrics(ep, s["success"], s["done_wall"] - t0, s["cmds_sent"], s["cmds_rx"],
                          events=s["events"], sat=sat)
     return em, wall, s
 
 
 def test_zero_profile(tmp_path):
-    em, wall, _ = _one(tmp_path, "zero")
+    em, wall, s = _one(tmp_path, "zero")
     assert wall < 30.0, wall
     assert em["success"], em
-    # nominal 0 ms; what is left is ground/sat polling (~1/2cmd_hz + a little)
-    assert em["rtt_p50"] < 25.0, em["rtt_p50"]
+    # T04: telemetry is stamped on arrival, so what is left is the loopback link (~1 ms)
+    # and the satellite's own cycle, NOT the ground's 20 ms poll quantisation (mean +10 ms)
+    assert em["rtt_p50"] < 5.0, em["rtt_p50"]
     assert em["cmd_loss"] < 0.05, em["cmd_loss"]
     assert em["events"]["vel_over"] == 0 and em["events"]["move_in_hold"] == 0
+    # T09: the episode ends at the done instant; the 1 s linger, join and write are not it
+    assert em["duration_s"] <= wall - 0.9, (em["duration_s"], wall)
+    assert em["stalls"] == 0, em["max_dt_s"]
 
 
 def test_leo_relay_profile(tmp_path):

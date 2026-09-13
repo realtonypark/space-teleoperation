@@ -100,8 +100,11 @@ from spaceteleop.link.emulator import _Dir, outage_schedule
 from spaceteleop.link.profiles import PROFILES, get, rtt_ms as nominal_rtt
 
 
-def _dir(p):
+def _dir(p, phase=0.0):
+    """A direction with its 15 s structure phase pinned, so `structure(t)` is readable.
+    The phase itself is tested by test_structure_phase_is_random_per_direction."""
     d = _Dir(p, ("127.0.0.1", 1), random.Random(3))
+    d.struct_phase = phase
     d.sock.close()
     d.out.close()
     return d
@@ -142,6 +145,23 @@ def test_burst_forces_the_bad_state():
     assert not _dir(_d(1, 0, period_s=15.0, burst_frac=0.0)).structure(0.5)[1]
 
 
+def test_structure_phase_is_random_per_direction():
+    """T03: phase-locked to Link.start(), the 15 s spike never touched a live command --
+    every successful episode ended before the first boundary. Each direction of each
+    episode now starts at a uniformly drawn point of the period."""
+    p = _d(30, 0, period_s=15.0, spike_ms=74.0, spike_dur_s=0.140)
+    ph = [_Dir(p, ("127.0.0.1", 1), random.Random(s)).struct_phase for s in range(400)]
+    assert all(0 <= x < 15.0 for x in ph)
+    assert 6.0 < statistics.mean(ph) < 9.0, statistics.mean(ph)     # U(0, 15) -> 7.5
+    assert len(set(ph)) == len(ph)
+    link = Link(PROFILES["leo_relay"], ("127.0.0.1", 1), ("127.0.0.1", 2), seed=5)
+    assert link.up.struct_phase != link.down.struct_phase
+    # the spike lands `period - phase` into the episode, not at t = 0
+    d = _dir(p, phase=14.95)
+    assert d.structure(0.0)[0] < 5.0 and 73 < d.structure(0.05)[0] <= 74
+    link.stop()
+
+
 def test_poisson_outage_rate_and_mixture():
     mix = ((0.87, 0.3, 2.0), (0.10, 2.0, 5.0), (0.03, 5.0, 31.0))
     s = outage_schedule(1.7, mix, 3600 * 500, random.Random(11))
@@ -159,6 +179,30 @@ def test_pass_window_blocks_everything_outside_it():
     assert 0 < len(order) < 25, len(order)
     for i in order:
         assert rel[i] < 0.06, (i, rel[i])
+
+
+def test_dropout_profiles_black_out_both_directions_on_schedule():
+    """T02: the Poisson schedule puts an outage inside a 20 s episode 0.9 % of the time, so
+    hold/retract were never exercised. These two force one, at a fixed instant, both ways."""
+    for name, length in (("leo_relay_drop1", 1.0), ("leo_relay_drop12", 12.0)):
+        for side in ("up", "down"):
+            d = _dir(get(name)[side])
+            assert not d.blacked_out(5.99)
+            assert d.blacked_out(6.0) and d.blacked_out(6.0 + length - 0.01)
+            assert not d.blacked_out(6.0 + length + 0.01)
+    assert not _dir(PROFILES["leo_relay"]["up"]).blacked_out(6.5)   # unchanged elsewhere
+    assert nominal_rtt("leo_relay_drop1") == 48                     # same link otherwise
+
+
+def test_sweep0_realised_delay_is_the_documented_clipped_mean():
+    """T08: `sweep:0` keeps the relay jitter and floors the delay at 0, so its realised
+    one-way mean is NOT 0. profiles.sweep() documents 5.0 ms up / 4.0 ms down for the
+    sampler itself (6.5 / 5.4 end to end over sockets, audit E1); pin the sampler."""
+    up, down = (_dir(get("sweep:0")[s]) for s in ("up", "down"))
+    mu = [statistics.mean([d.delay() * 1000 for _ in range(50000)]) for d in (up, down)]
+    assert abs(mu[0] - 5.0) < 0.5, mu
+    assert abs(mu[1] - 4.0) < 0.5, mu
+    assert nominal_rtt("sweep:0") == 0.0            # the NOMINAL is still 0, as labelled
 
 
 def test_profiles_are_the_synthesis_table():

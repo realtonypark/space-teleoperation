@@ -12,16 +12,29 @@ import matrix                                                           # noqa: 
 ARMS6 = ["b", "t", "d", "g", "p", "pg"]          # B T D G P Pg, selection.md section 3
 
 
-@pytest.mark.parametrize("block,n", [("A", 66), ("B", 66), ("C", 12), ("E", 30)])
+@pytest.mark.parametrize("block,n", [("A", 66), ("B", 66), ("C", 12), ("E", 30), ("S", 24)])
 def test_tier1_counts(block, n):
-    """selection.md section 3 Tier 1: 66 + 66 + 12 + 30 = 174 cells at 6 arms."""
+    """selection.md section 3 Tier 1 + the audit-T02 dropout block S (2 tasks x 6 arms x
+    2 profiles): 66 + 66 + 12 + 30 + 24 = 198 cells at 6 arms."""
     cs = matrix.cells(1, [block], ARMS6, 30, ablations=["pg"], baseline="b")
     assert len(cs) == n
     assert len({c.name for c in cs}) == n
 
 
+def test_dropout_block_forces_an_outage_in_every_episode():
+    """T02: block S is the only place hold/retract is ever exercised."""
+    cs = matrix.cells(1, ["S"], ARMS6, 30, ablations=["pg"], baseline="b")
+    assert {c.profile for c in cs} == {"leo_relay_drop1", "leo_relay_drop12"}
+    assert {c.task for c in cs} == {"capture", "peg"}
+    assert {c.tau_h for c in cs} == {0.17}
+    # the 12 s outage eats over half a 20 s episode, so that profile gets 30 s
+    assert {c.max_s for c in cs if c.profile.endswith("drop12")} == {30.0}
+    assert {c.max_s for c in cs if c.task == "capture" and c.profile.endswith("drop1")} \
+        == {20.0}
+
+
 def test_tier1_total_and_scaling():
-    assert len(matrix.cells(1, None, ARMS6, 30, ablations=["pg"], baseline="b")) == 174
+    assert len(matrix.cells(1, None, ARMS6, 30, ablations=["pg"], baseline="b")) == 198
     # counts follow the strategy list, they are not baked in
     assert len(matrix.cells(1, ["A"], ["b"], 30)) == 11
     assert len(matrix.cells(1, ["A"], ARMS6[:3], 30)) == 33
@@ -54,17 +67,26 @@ def test_resume_skips_existing(tmp_path):
 
 
 def test_parse_stdout():
-    txt = ("arm 0 ep 0 seed 0 success=True 9.2s rtt_p50=12ms hold=0.00s unsafe=1 frames=403\n"
-           "arm 0 ep 1 seed 1 success=False 20.1s rtt_p50=10ms hold=0.50s unsafe=0 frames=346\n"
+    txt = ("arm 0 ep 0 seed 0 success=True 9.2s rtt_p50=12ms hold=0.00s unsafe=1 cage=1 "
+           "stalls=0 max_dt=0.01s frames=403\n"
+           "arm 0 ep 1 seed 1 success=False 20.1s rtt_p50=10ms hold=0.50s unsafe=0 cage=0 "
+           "stalls=2 max_dt=1.30s frames=346\n"
            "\nsuccess_rate     0.50\ndemos_per_hour   391.3\nsal              -4.54\n"
-           "unsafe_events    1  (move_in_hold=0, vel_over=0, keepout=0, cage=1)\n"
-           "diagnostics      hold=0, ramp_clip=1768\n")
+           "unsafe_events    1  (move_in_hold=0, vel_over=0, keepout=1)\n"
+           "cage             1\nstalls           2\nmax_dt_s         1.300\n"
+           "diagnostics      hold=0, ramp_clip=1768, cage=1\n")
     eps, agg = matrix.parse_stdout(txt)
     assert [e["seed"] for e in eps] == [0, 1]
     assert [e["success"] for e in eps] == [True, False]
     assert eps[1]["duration_s"] == 20.1
     assert agg["demos_per_hour"] == 391.3 and agg["sal"] == -4.54
-    assert agg["unsafe"] == 1 and agg["events"]["cage"] == 1
+    # cage is NOT in `unsafe` any more (T07) but is still readable per cell and per episode
+    assert agg["unsafe"] == 1 and agg["events"]["keepout"] == 1
+    assert agg["cage"] == 1 and agg["events"]["cage"] == 1
+    assert [e["cage"] for e in eps] == [1, 0]
+    # T06: a cell that stalled under load is flagged, per episode and in the aggregate
+    assert [e["stalls"] for e in eps] == [0, 2] and eps[1]["max_dt_s"] == 1.30
+    assert agg["stalls"] == 2 and agg["max_dt_s"] == 1.3
     assert agg["events"]["ramp_clip"] == 1768
 
 

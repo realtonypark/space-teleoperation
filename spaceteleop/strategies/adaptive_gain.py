@@ -25,7 +25,7 @@ from .baseline import Baseline
 
 
 class Gain(Baseline):
-    L0 = 0.29       # the `zero` profile's loop delay: the gain this pins K*L to
+    RTT0 = 0.002    # s, the measured `zero`-profile link RTT (audit T04, E1: 1.25 ms)
     tau_h = 0.17
     tel_hz = 30.0
     ema_s = 0.2
@@ -37,11 +37,26 @@ class Gain(Baseline):
         self.echo = -1
         self.s = 1.0
 
+    @property
+    def L0(self):
+        """The MEASURED zero-latency loop delay this pins K*L to (audit F5).
+
+        Same four terms L_hat is built from, at the zero profile's own RTT: playout +
+        half a telemetry period of satellite dwell + the human + the loopback link. At the
+        defaults that is 30 + 16.7 + 170 + 2 = 219 ms. The old hard-coded 0.29 was 58 ms
+        above the loop it was meant to represent, so `s` stayed pinned at 1.000 on
+        `leo_relay` (G was literally B there) and moved with `tau_h` on block E, which made
+        the tau_h comparison a comparison of two different controllers."""
+        return self.interp_s + 0.5 / self.tel_hz + self.tau_h + self.RTT0
+
     def ground_step(self, tel, target):
         if self.operator is None:                     # satellite-side copy: nothing to scale
             return target
         if self.speed0 is None:
-            self.speed0 = self.operator.speed
+            # F6: the operator persists across chained episodes, so a fresh Gain must not
+            # take the PREVIOUS episode's already-scaled speed as its reference.
+            self.speed0 = getattr(self.operator, "speed0", None) or self.operator.speed
+            self.operator.speed0 = self.speed0
         dwell = max(0, tel["t_send"] - tel["t_cmd_applied"]) / 1e9
         if tel["last_cmd_seq"] != self.echo and tel["last_cmd_t_send"] > 0:
             self.echo = tel["last_cmd_seq"]

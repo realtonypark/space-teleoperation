@@ -120,14 +120,19 @@ def run_arm(m, args, arm, sink):
         out = args.out if args.arms == 1 else f"{args.out}/arm{arm}"
         path = write_episode(out, k, rows, task=args.task, index0=n, satlog=s["satlog"])
         n += len(rows)
-        em = episode_metrics(load_episode(path), s.get("success"), time.monotonic() - t0,
+        # T09: the episode ends at the success/done instant (or the cap). `done_wall` is the
+        # satellite's own stamp for it; what follows is the 1 s linger, the thread join and
+        # the npz write, none of which a data campaign would pay for twice.
+        dur = (s["done_wall"] - t0) if s.get("done_wall") else time.monotonic() - t0
+        em = episode_metrics(load_episode(path), s.get("success"), dur,
                              s["cmds_sent"], s.get("cmds_rx", 0), events=s.get("events"),
                              sat=load_sat(path), vmax=Baseline.vmax)
         eps.append(em)
         bw.append(s["link"])
         print(f"arm {arm} ep {k} seed {seed} success={em['success']} "
               f"{em['duration_s']:.1f}s rtt_p50={em['rtt_p50']:.0f}ms "
-              f"hold={em['hold_s']:.2f}s unsafe={em['unsafe']} frames={em['frames']}"
+              f"hold={em['hold_s']:.2f}s unsafe={em['unsafe']} cage={em['cage']} "
+              f"stalls={em['stalls']} max_dt={em['max_dt_s']:.2f}s frames={em['frames']}"
               + (f" reset={s['reset_s']:.1f}s" if chain else "")
               + (f" innov={s['twin_innov_m'] * 1000:.1f}mm" if "twin_innov_m" in s else ""))
     sink[arm] = (eps, bw, resets)

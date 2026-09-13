@@ -58,8 +58,10 @@ def outage_schedule(rate_per_h, mix, horizon_s, rng):
 
 class Link:
     def __init__(self, profile, sat_addr, ground_addr, seed=0):
-        self.up = _Dir(profile["up"], sat_addr, random.Random(seed))
-        self.down = _Dir(profile["down"], ground_addr, random.Random(seed + 1))
+        # 2*seed / 2*seed+1, not seed / seed+1 (audit T12): with the latter episode k's
+        # downlink stream was episode k+1's uplink stream, drawing the same outages.
+        self.up = _Dir(profile["up"], sat_addr, random.Random(2 * seed))
+        self.down = _Dir(profile["down"], ground_addr, random.Random(2 * seed + 1))
         self.up_port = self.up.sock.getsockname()[1]
         self.down_port = self.down.sock.getsockname()[1]
         self._threads = []
@@ -106,6 +108,11 @@ class _Dir:
         self.next_free = 0.0
         # random phase: otherwise every episode would start inside the same blackout
         self.phase = rng.random() * (p["outage_period_s"] or 1.0)
+        # same for the 15 s structure (audit T03): phase-locked to Link.start() the spike,
+        # the end bump and the burst-loss second never touched a live command, because every
+        # successful episode ended before the first boundary. U(0, period) per direction per
+        # episode makes each episode a uniform sample of the period instead.
+        self.struct_phase = rng.random() * p["period_s"]
         # pass windows start AT a pass on purpose: direct_gs throughput is reported per
         # pass (SYNTHESIS section 6), and a 20 s episode must not land in a 35 min gap.
         self.outages = outage_schedule(p["outage_rate_per_h"], p["outage_mix"],
@@ -114,10 +121,14 @@ class _Dir:
         self.last_release = 0.0
 
     def structure(self, t):
-        """-> (extra_delay_ms, force_bad_state) for elapsed time `t` in the 15 s layer."""
+        """-> (extra_delay_ms, force_bad_state) for elapsed time `t` in the 15 s layer.
+
+        `t` is shifted by this direction's random period phase, so an episode starting at
+        link t = 0 lands at a uniformly drawn point of the period."""
         p = self.p
         if not p["period_s"]:
             return 0.0, False
+        t = t + self.struct_phase
         i = int(t / p["period_s"])
         if i != self.period_i:                     # new period: redraw shift and burst
             self.period_i = i
@@ -133,6 +144,10 @@ class _Dir:
 
     def blacked_out(self, t):
         p = self.p
+        # forced outage at a fixed instant after link start: the only way an episode is
+        # guaranteed to exercise hold/retract (audit T02, the `*_drop*` profiles)
+        if p["drop_len_s"] and p["drop_at_s"] <= t < p["drop_at_s"] + p["drop_len_s"]:
+            return True
         if p["pass_on_s"] and (t % (p["pass_on_s"] + p["pass_off_s"])) >= p["pass_on_s"]:
             return True
         if p["outage_dur_s"] and (t + self.phase) % p["outage_period_s"] < p["outage_dur_s"]:

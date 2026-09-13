@@ -5,3 +5,4 @@ __pycache__/
 docs/experiments/raw/
 *.egg-info/
 .claude/
+docs/experiments/raw*/

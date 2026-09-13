@@ -1,4 +1,6 @@
 """Self-check: wire format round-trips and rejects junk; recorder + metrics round-trip."""
+import json
+
 import numpy as np
 
 from spaceteleop.metrics import aggregate, episode_metrics, ldlj, sal, table
@@ -31,11 +33,76 @@ def test_record_and_metrics(tmp_path):
     assert em["success"] and abs(em["cmd_loss"] - 0.05) < 1e-9
     assert 40 <= em["rtt_p50"] <= 44 and em["hold_frames"] == 9
     assert abs(em["hold_s"] - 0.18) < 1e-6
-    assert em["unsafe"] == 3 and em["events"]["vel_over"] == 0   # `hold` is a diagnostic
+    # `hold` is a diagnostic, and `cage` is reported apart from the link-caused
+    # counters, not summed into `unsafe` (audit T07)
+    assert em["unsafe"] == 1 and em["events"]["vel_over"] == 0
+    assert em["cage"] == 2 and em["stalls"] == 0
     agg = aggregate([em, dict(em, success=False)])
     assert agg["success_rate"] == 0.5 and abs(agg["demos_per_hour"] - 1800) < 1
-    assert agg["unsafe"] == 6 and agg["events"]["cage"] == 4
-    assert "cage=4" in table("t", agg) and "hold=14" in table("t", agg)
+    assert agg["unsafe"] == 2 and agg["cage"] == 4 and agg["events"]["cage"] == 4
+    t = table("t", agg)
+    assert "cage             4" in t and "hold=14" in t
+    assert "unsafe_events    2" in t and "stalls           0" in t
+
+
+def test_smoothness_comes_from_the_sidecar_not_the_sampled_observation(tmp_path):
+    """T05: `observation.state` is a 50 Hz sample-and-hold of 30 Hz telemetry, which on its
+    own puts a floor of ~0.4 under stall_frac. The same motion read off the satellite's
+    applied-setpoint log must not show that floor."""
+    t = np.linspace(0, 4, 2000)                       # 500 Hz control log, one moving joint
+    q = 0.5 * (1 - np.cos(np.pi * np.clip(t / 4.0, 0, 1)))
+    sat_rows = [(int(ti * 1e9), 0, i // 10, False, [qi] + [0.0] * 6)
+                for i, (ti, qi) in enumerate(zip(t, q))]
+    held = q[(np.arange(200) * 10) // 16 * 16 // 10]  # the same motion, sampled and held
+    rows = [dict(**{"observation.state": [x] + [0.0] * 6, "action": [x] + [0.0] * 6,
+                    "timestamp": 0.02 * i}, cmd_seq=i, rtt_ms=40, owd_up_ms=20,
+                 safety_hold=False) for i, x in enumerate(held)]
+    p = write_episode(str(tmp_path), 0, rows, satlog=sat_rows)
+    ep, sat = load_episode(p), load_sat(p)
+    with_sat = episode_metrics(ep, True, 4.0, 200, 200, sat=sat)
+    without = episode_metrics(ep, True, 4.0, 200, 200)          # the old, held path
+    assert without["stall_frac"] > 0.35                          # the artefact floor
+    assert with_sat["stall_frac"] < 0.15, with_sat["stall_frac"]
+    assert with_sat["ldlj"] > without["ldlj"]                    # hold artefact dominated it
+    assert with_sat["stalls"] == 0 and with_sat["max_dt_s"] < 0.01
+
+
+def test_stalls_flag_a_contaminated_episode(tmp_path):
+    """T06: a satellite cycle longer than STALL_DT is CPU contention, not the link."""
+    t = list(np.arange(0, 1.0, 0.002)) + [1.9, 1.902]            # one 0.9 s gap
+    log = [(int(x * 1e9), 0, i, False, [0.0] * 7) for i, x in enumerate(t)]
+    rows = [dict(**{"observation.state": [0.0] * 7, "action": [0.0] * 7,
+                    "timestamp": 0.02 * i}, cmd_seq=i, rtt_ms=1, owd_up_ms=0,
+                 safety_hold=False) for i in range(50)]
+    p = write_episode(str(tmp_path), 0, rows, satlog=log)
+    em = episode_metrics(load_episode(p), True, 2.0, 50, 50, sat=load_sat(p))
+    assert em["stalls"] == 1 and abs(em["max_dt_s"] - 0.898) < 0.01
+    assert aggregate([em, em])["stalls"] == 2
+
+
+def test_info_json_carries_the_lerobot_keys(tmp_path):
+    """T11: a v2.x loader parses these before it ever opens a data file."""
+    rows = [dict(**{"observation.state": [0.0] * 7, "action": [0.0] * 7,
+                    "timestamp": 0.02 * i}, cmd_seq=i, rtt_ms=1, owd_up_ms=0,
+                 safety_hold=False, assist=(i > 40)) for i in range(50)]
+    write_episode(str(tmp_path), 0, rows, task="capture")
+    write_episode(str(tmp_path), 1, rows, task="peg", index0=50)
+    info = json.loads((tmp_path / "meta" / "info.json").read_text())
+    for k in ("total_tasks", "total_videos", "total_chunks", "chunks_size", "splits",
+              "data_path", "video_path", "codebase_version", "fps", "features"):
+        assert k in info, k
+    assert info["codebase_version"] == "v2.1" and info["total_tasks"] == 2
+    assert info["splits"] == {"train": "0:2"} and info["total_episodes"] == 2
+    f = info["features"]
+    assert f["observation.state"]["names"][:2] == ["Rotation", "Pitch"]
+    assert f["action"]["shape"] == [7] and "task_index" in f
+    tasks = [json.loads(l) for l in
+             (tmp_path / "meta" / "tasks.jsonl").read_text().splitlines()]
+    assert [t["task"] for t in tasks] == ["capture", "peg"]
+    assert [t["task_index"] for t in tasks] == [0, 1]
+    ep = load_episode(str(tmp_path / "data" / "episode_000001.npz"))
+    assert ep["task_index"].tolist() == [1] * 50          # the column the loader joins on
+    assert ep["assist"].sum() == 9                        # H11 mask, ground or satellite
 
 
 def test_smoothness_ranks_a_jittery_trajectory_below_a_smooth_one():

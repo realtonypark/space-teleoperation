@@ -12,11 +12,11 @@ Final report, draft. Experiments are still running; every experimental number is
 
 **The recommended architecture, in five bullets.**
 
-- **Link.** Primary: two Starlink mini-laser terminals, contracted 2026 for a 2027 flight, 48 ms RTT median with 15 s spikes to about 125 ms. Fallback: direct ground-station passes through a four-site polar network. Safety channel: IDRS L-band or Iridium Certus. GEO relay is disqualified by its propagation floor (SYNTHESIS §2).
-- **Protocol.** A 50 Hz UDP stream of timestamped, sequence-keyed joint setpoints, 40 B payload, sent twice. Video is two 720p30 streams per operator inside a 10.4 Mbps downlink for four operators (multi_operator_bandwidth §2, §3).
-- **Satellite.** Decision (c): setpoint playout with a 30 ms buffer, hold at 300 ms, retract at 10 s, ramp-limited resume, static envelopes, and hardware cutoffs, all on a rad-tolerant supervisor. No vision, no models, no autonomy that changes the trajectory (SYNTHESIS §5).
-- **Ground.** Leader-follower or VR without force feedback, a session broker that grants one write authority per arm, fanned-out observers, and a 50 Hz follower rate regardless of link rate (multi_operator_bandwidth §4; teleop_fundamentals §1.4).
-- **Mission.** A pressurised ESPA-class bus (Apex Aries, 100 kg) with a 100–300 L aluminium cylinder at 1 atm holding four Dynamixel-class 6-DoF arms, global-shutter cameras, a Jetson Orin NX for video, and a separate deterministic supervisor. Order-of-magnitude cost $6–12 M including launch (SYNTHESIS §4; hardware_landscape §7).
+- **Link.** Primary: two Starlink mini-laser terminals, 48 ms RTT median with 15 s spikes to about 125 ms. Fallback: direct passes through a four-site polar network. Safety channel: IDRS L-band or Iridium. GEO relay is disqualified by its propagation floor (SYNTHESIS §2).
+- **Protocol.** A 50 Hz UDP stream of timestamped, sequence-keyed joint setpoints, 40 B payload, sent twice. Two 720p30 streams per operator inside a 10.4 Mbps downlink for four operators (multi_operator_bandwidth §2, §3).
+- **Satellite.** Decision (c): 30 ms playout, hold at 300 ms, retract at 10 s, ramp-limited resume, static envelopes, hardware cutoffs, all on a rad-tolerant supervisor. No vision, no models, no autonomy that changes the trajectory (SYNTHESIS §5).
+- **Ground.** Leader-follower or VR without force feedback, a session broker granting one write authority per arm, fanned-out observers, 50 Hz follower rate regardless of link rate (multi_operator_bandwidth §4; teleop_fundamentals §1.4).
+- **Mission.** A pressurised ESPA-class bus (Apex Aries, 100 kg), a 100–300 L aluminium cylinder at 1 atm holding four Dynamixel-class arms, global-shutter cameras, a Jetson Orin NX for video, a separate deterministic supervisor. About $6–12 M including launch (SYNTHESIS §4; hardware_landscape §7).
 
 **The three numbers that matter.**
 
@@ -30,9 +30,9 @@ Final report, draft. Experiments are still running; every experimental number is
 
 ## 2. Problem and scope
 
-The charter (PROGRAM.md) fixes the goal: determine whether, and how, humans on Earth can teleoperate simple robot arms inside a LEO satellite to collect physical-AI demonstration data that Earth-side simulation cannot produce. We cannot launch. The proof is a validated architecture plus a runnable testbed that reproduces orbit-link behaviour over real sockets and shows the numbers.
+The charter (PROGRAM.md) fixes the goal: determine whether, and how, humans on Earth can teleoperate simple robot arms inside a LEO satellite to collect physical-AI demonstration data that Earth-side simulation cannot produce. We cannot launch, so the proof is a validated architecture plus a runnable testbed over real sockets.
 
-**Fixed by the user.** Deliverable: architecture spec, testbed, experiments, this report, mission sketch as appendix. No human in the loop; agents review agents. Leader-follower or VR interface, no force feedback, synthetic operators in the testbed. Onboard baseline at minimum (b): joint setpoints, a short interpolated command buffer, hold or retract on timeout; no models or vision, with one hypothesis branch quantifying onboard compute. Scale 4–8 arms and 4 concurrent operators. MuJoCo at zero gravity, TLE-driven pass geometry, a UDP link emulator on localhost, video as delay plus bandwidth budget, LeRobot data format. Default acceptance: 80 % of zero-latency success and demos per hour with zero unsafe motion on dropout. About 20 quality-gated hypotheses, verifier-ranked, top 3–5 implemented against a naive baseline.
+**Fixed by the user.** Deliverable: architecture spec, testbed, experiments, this report. No human in the loop; agents review agents. Leader-follower or VR, no force feedback, synthetic operators. Onboard baseline at minimum (b): joint setpoints, a short interpolated buffer, hold or retract on timeout; no models or vision, one branch quantifying onboard compute. 4–8 arms, 4 concurrent operators. MuJoCo at zero gravity, TLE pass geometry, a UDP link emulator on localhost, video as delay plus bandwidth, LeRobot format. Default acceptance: 80 % of zero-latency success and demos per hour, zero unsafe motion on dropout. About 20 quality-gated hypotheses, verifier-ranked, top 3–5 implemented against a naive baseline.
 
 **Decided by research.** Link path, orbit, bus class, pressurisation, onboard capability level, task set, hardware stack and input device, under two constraints: rideshare-launchable, buyable today. Sections 3 to 6 report the choices.
 
@@ -61,7 +61,7 @@ All rows: space_teleop_prior_art §1.
 
 ### 3.2 Link ranking
 
-The link decision is the most consequential in the program. Five candidate paths were ranked (SYNTHESIS §2).
+Five candidate paths were ranked (SYNTHESIS §2).
 
 | Rank | Path | RTT p50 / p95 | Coverage | Up / down | Why it wins or loses |
 |---|---|---|---|---|---|
@@ -133,13 +133,13 @@ Decision (c): the (b) baseline plus small deterministic safety logic, all on the
 5. Static envelopes: joint position, velocity and acceleration clamps, and a keep-out box that is the cage interior. This is the Astrobee keep-out-zone and Canadarm2 LOS-safe pattern that every flown ground-driven robot uses (space_teleop_prior_art §1, §Implication).
 6. Hardware cutoffs: per-motor thermal cutoff and a latching current limiter at 80 % of peak, exactly the Astrobee arm design (hardware_landscape §3).
 
-Excluded from the baseline: vision, learned models, admittance or force control, any subgoal primitive, any autonomy that changes the trajectory. The onboard-compliance result, nut threading 49 → 65–81 % (teleop_fundamentals §2), is the strongest hider in the evidence and is therefore a hypothesis branch. (c) beats (b) because the relay path has 1.7 heavy-tailed outages per hour and every flown system that survived loss of signal did so with onboard envelopes, not hold alone (SYNTHESIS §5). The logic is stateless bar one timer and sits on the supervisor because a Jetson single-event functional interrupt is a multi-second reboot (hardware_landscape §5).
+Excluded: vision, learned models, admittance or force control, any subgoal primitive, any autonomy that changes the trajectory. The onboard-compliance result, nut threading 49 → 65–81 % (teleop_fundamentals §2), is the strongest hider in the evidence and is therefore a hypothesis branch. (c) beats (b) because every flown system that survived loss of signal did so with onboard envelopes, not hold alone (SYNTHESIS §5). The logic sits on the supervisor because a Jetson single-event functional interrupt is a multi-second reboot (hardware_landscape §5).
 
 ### 4.5 Ground client
 
 Leader-follower or VR without force feedback: force coupling is what became unstable in every relay-path program, and passivity control is irrelevant without it (space_teleop_prior_art §Implication; teleop_fundamentals §2). The follower runs at 50 Hz regardless of link rate; 5 Hz teleop cost 62 % more time (teleop_fundamentals §1.4; data_pipeline §2.1).
 
-Sessions follow the Astrobee and ISS POIC pattern (multi_operator_bandwidth §4): one commanding authority per arm, enforced on the ground; everyone else a read-only subscriber of one fanned-out stream; onboard safe behaviour on loss of signal; robot time booked in pass-sized slots. A session broker implements this.
+A session broker implements the Astrobee and ISS POIC pattern (multi_operator_bandwidth §4): one commanding authority per arm, read-only observers on a fanned-out stream, onboard safe behaviour on loss of signal, pass-sized booked slots.
 
 In the testbed the human is a synthetic operator: it sees only link-delayed telemetry, reacts to what it saw 0.17 s ago, and commands a position at bounded Cartesian speed until it sees it has arrived (`spaceteleop/ground/operators.py`). Policy and gains are identical at every latency, so the operator is the constant and the link the variable. The 0.17 s is the human online visuomotor correction latency of 143–170 ms (teleop_fundamentals §3).
 
@@ -182,19 +182,19 @@ The testbed writes a LeRobot-v2-shaped dataset: one `.npz` per episode in place 
 
 Three choices come from the data-quality evidence.
 
-- **A satellite-side applied log.** A sidecar holds one row per control cycle: cycle time, application time, sequence, hold flag, applied setpoint, assist and tether flags. The main table carries about 85 ms of observation-action skew on `leo_relay`; the sidecar re-pairs the true applied action, and smoothness is computed on it rather than on 30 Hz telemetry aliased to 50 Hz rows (selection.md §3).
-- **Per-row link timestamps.** Policies trained on zero-latency data need latency matching at deployment, so every row carries measured RTT and a `link_state` of ok, hold, retract or outage (data_pipeline §2.3, §3.1).
-- **Curation metrics, reported not gated.** robomimic "Worse" operators reached 92 % on Can but produced 39 % versus 66 % policies on Square; keeping the top half by spectral arc length lifted policy success from 39 % to 55 % (data_pipeline §2.1). The recorder reports SAL, log dimensionless jerk and stall fraction per episode against the zero-latency baseline (SYNTHESIS §6).
+- **A satellite-side applied log.** One row per control cycle: cycle time, application time, sequence, hold flag, applied setpoint, assist and tether flags. The main table carries about 85 ms of observation-action skew on `leo_relay`; smoothness is computed on the sidecar, not on 30 Hz telemetry aliased to 50 Hz rows (selection.md §3).
+- **Per-row link timestamps.** Policies trained on zero-latency data need latency matching at deployment, so every row carries measured RTT and a `link_state` (data_pipeline §2.3, §3.1).
+- **Curation metrics, reported not gated.** robomimic "Worse" operators reached 92 % on Can but produced 39 % versus 66 % policies on Square; keeping the top half by spectral arc length lifted policy success from 39 % to 55 % (data_pipeline §2.1). The recorder reports SAL, log dimensionless jerk and stall fraction per episode (SYNTHESIS §6).
 
 ---
 
 ## 5. Mission shape and hardware stack
 
-**Bus class: ESPA.** Continuous payload draw is 100–190 W, 2–5× a 16U CubeSat's 25–60 W orbit-average and 55–100 % of the Apex Aries' 175 W end-of-life power (hardware_landscape §1). The Aries carries 100 kg on a SpaceX rideshare, first flew in 2024, and costs $3.5–9.5 M (secondary) plus about $1.05 M launch (hardware_landscape §1, §7).
+**Bus class: ESPA.** Continuous payload draw is 100–190 W, 2–5× a 16U CubeSat's orbit-average and 55–100 % of the Apex Aries' 175 W end-of-life power (hardware_landscape §1). The Aries carries 100 kg on a SpaceX rideshare, first flew in 2024, and costs $3.5–9.5 M (secondary) plus about $1.05 M launch (hardware_landscape §1, §7).
 
-**Pressurisation: yes.** A 100–300 L aluminium cylinder at 1 atm with domed ends weighs 3.5–10 kg with fittings (hardware_landscape §2). Brushed motors need atmosphere for the commutator film, hobby servos have no convection path in vacuum, and vacuum-rated arms such as the 50 kg GITAI IN2 exceed the payload budget (hardware_landscape §2). Tasks 1 and 3 independently prefer a pressurised bus (unique_data_study §4). SpaceX treats a sealed 1-atm container as pressurised equipment at 1.5× yield and 2.0× ultimate (hardware_landscape §2).
+**Pressurisation: yes.** A 100–300 L aluminium cylinder at 1 atm weighs 3.5–10 kg with fittings. Brushed motors and hobby servos need atmosphere, and vacuum-rated arms such as the 50 kg GITAI IN2 exceed the payload budget (hardware_landscape §2). Tasks 1 and 3 prefer a pressurised bus (unique_data_study §4).
 
-**Arms: four in the baseline, eight as the scale branch.** Four is what four operators use, what the bandwidth budget is sized for, and what unique_data_study §5 allocates cells to (SYNTHESIS §4). The precedent is Astrobee: stock Dynamixel X servos, a hardware flip-flop cutting the driver at 80 % of peak current, a bimetal thermostat per motor, on the ISS since July 2019 (hardware_landscape §3).
+**Arms: four in the baseline, eight as the scale branch.** Four is what four operators use, what the bandwidth budget is sized for, and what unique_data_study §5 allocates cells to (SYNTHESIS §4). The precedent is Astrobee: stock Dynamixel X servos, a current cutoff at 80 % of peak, a thermostat per motor, on the ISS since 2019 (hardware_landscape §3).
 
 | Subsystem | Choice | Source |
 |---|---|---|
@@ -212,11 +212,11 @@ Order-of-magnitude total: $6–12 M including launch, and the bus dominates (har
 
 **Top risks** (hardware_landscape, "Top three risks").
 
-1. No buyable path is both continuous and low-latency in 2026. Kepler is "sub-second" with no published number; X-band direct-to-Earth covers under 10 % of the orbit per station; the Starlink mini laser is the only candidate for both and its mass, power, price and ITAR status are unpublished.
-2. COTS radiation behaviour is unquantified where it matters. No TID or SEE data for Dynamixel or Feetech servos, no published on-orbit Jetson reboot rate, and Jetson TX2 boards died at 9.7–25 krad. The arms must be held by an independent supervisor through Jetson reboots.
-3. Power and thermal ceiling. 100–190 W continuous rules out 12U and 16U; Aries at 175 W leaves little margin; no CubeSat X-band radio datasheet states a continuous-transmit qualification.
+1. No buyable path is both continuous and low-latency in 2026. Kepler has no published latency; X-band direct-to-Earth covers under 10 % of the orbit per station; the Starlink mini laser is the only candidate for both, with mass, power, price and ITAR status unpublished.
+2. COTS radiation behaviour is unquantified. No TID or SEE data for Dynamixel or Feetech servos, no published Jetson reboot rate; Jetson TX2 boards died at 9.7–25 krad. An independent supervisor must hold the arms through Jetson reboots.
+3. Power and thermal ceiling. 100–190 W continuous rules out 12U and 16U; Aries at 175 W leaves little margin; no CubeSat X-band datasheet states a continuous-transmit qualification.
 
-**What a 16U pass-only variant gives up.** Requiring a continuous link is the most cost-driving decision: relay terminals at 40–70 W plus continuous downlink power push the payload past any CubeSat class (SYNTHESIS §4). A 16U with 10.3U of payload volume supports one cylinder of about 8 L, one or two small arms, direct-to-Earth passes only (hardware_landscape §1, §2). It gives up continuous coverage, so teleop runs at 21 % duty in 9 min windows with 35 min median gaps (network_emulation §1.4); four concurrent operators; and the granular and liquid cells. It keeps the flown, measured 20–30 ms regime and is the right shape for a flight whose job is to validate the link emulator against a real pass.
+**What a 16U pass-only variant gives up.** Requiring a continuous link is the most cost-driving decision: relay terminals at 40–70 W plus continuous downlink power push the payload past any CubeSat class (SYNTHESIS §4). A 16U supports one cylinder of about 8 L, one or two small arms, passes only (hardware_landscape §1, §2). It gives up continuous coverage, so teleop runs at 21 % duty in 9 min windows with 35 min gaps (network_emulation §1.4), four concurrent operators, and the granular and liquid cells. It keeps the flown 20–30 ms regime and suits a flight whose job is to validate the link emulator against a real pass.
 
 ---
 
@@ -226,12 +226,12 @@ No Earth analog gives 6-DoF free motion for longer than about 24 s; the only lon
 
 The residual gap after the best simulator and the best Earth analog ranks as follows (unique_data_study §2).
 
-1. **Granular media below 1e-4 g.** Behaviour "cannot be extrapolated" from 1e-2 g parabolic data; rebound and ejecta appear at 10 cm/s in microgravity but not at lunar gravity; the ISS mass-flow law deviates at low g. MuJoCo has no granular material.
+1. **Granular media below 1e-4 g.** Behaviour "cannot be extrapolated" from 1e-2 g parabolic data; rebound and ejecta appear at 10 cm/s in microgravity but not at lunar gravity. MuJoCo has no granular material.
 2. **Fluids.** Before SPHERES-Slosh "little experimental data for long-duration zero-gravity slosh existed"; the ISS study reached only qualitative CFD comparison.
-3. **Deformables.** Astrobee cargo-bag work is simulation-only and calls deformable dynamics "an open challenge". No sustained microgravity dataset of a gripper handling cable or fabric exists.
-4. **Free-floating capture.** Rigid dynamics at zero g is flight-verified, but MuJoCo has no restitution coefficient and "cannot simulate elastic collision". Real grasp impulses on a free 6-DoF target over minutes exist only in orbit.
+3. **Deformables.** Astrobee cargo-bag work is simulation-only and calls deformable dynamics "an open challenge".
+4. **Free-floating capture.** Rigid dynamics at zero g is flight-verified, but MuJoCo has no restitution coefficient. Real grasp impulses on a free 6-DoF target over minutes exist only in orbit.
 
-Arm-base coupling, tool use, vacuum contact and lighting rank 5 to 8: exactly simulable, reproducible in thermal-vacuum chambers, or absent inside a pressurised LED-lit volume (unique_data_study §2).
+Arm-base coupling, tool use, vacuum contact and lighting rank 5 to 8: simulable, reproducible in vacuum chambers, or absent inside a pressurised LED-lit volume (unique_data_study §2).
 
 | # | Task | Phenomenon exposed | Latency sensitivity |
 |---|---|---|---|
@@ -241,7 +241,7 @@ Arm-base coupling, tool use, vacuum contact and lighting rank 5 to 8: exactly si
 | 4 | Cable routing and fabric pouch open/close (30 cm cable, two connectors, Velcro pouch) | deformable dynamics in microgravity (unique_data_study §2 C) | medium: connector mating is insertion-class, ~150–200 ms |
 | 5 | Peg-in-hole on a fixture rigidly mounted to the bus, wheel torques logged | arm-base momentum coupling and base identification (unique_data_study §2 E) | high: precision insertion, ideal <200 ms, drops 500–700 ms |
 
-Source: SYNTHESIS §3; latency classes from teleop_fundamentals §4. All tasks run inside a cage so nothing drifts out of reach, with objects at order cm/s (unique_data_study §3, §4). Tasks 1–4 are the unique-value payload; at least two arms should carry a granular cell and one a liquid cell (unique_data_study §5). Tasks 2 and 5 are the MuJoCo proxies for the success-versus-latency curve; capture results are a lower bound because grasp-impulse transients are not simulated (SYNTHESIS §3). The slowness of the unique-value tasks is the largest latency hider available (SYNTHESIS §10).
+Source: SYNTHESIS §3; latency classes from teleop_fundamentals §4. All tasks run inside a cage with objects at order cm/s (unique_data_study §4). Tasks 1–4 are the unique-value payload; at least two arms carry a granular cell and one a liquid cell (unique_data_study §5). Tasks 2 and 5 are the MuJoCo proxies for the curve; capture results are a lower bound because grasp-impulse transients are not simulated (SYNTHESIS §3). The slowness of the unique-value tasks is the largest latency hider available (SYNTHESIS §10).
 
 ---
 
@@ -249,13 +249,13 @@ Source: SYNTHESIS §3; latency classes from teleop_fundamentals §4. All tasks r
 
 ### 7.1 What it is
 
-Pure Python 3.12; mujoco, numpy and sgp4 are the only runtime dependencies (`pyproject.toml`). Three roles run as threads in one interpreter over real UDP sockets on 127.0.0.1 (`spaceteleop/run.py`).
+Python 3.12 with mujoco, numpy and sgp4 only. Three roles run as threads in one interpreter over real UDP sockets on 127.0.0.1 (`spaceteleop/run.py`).
 
-- **Ground** (`spaceteleop/ground/`): hands the operator a frame `tau_h` old, sends 7-slot setpoints at 50 Hz, measures RTT from the echo with dwell subtracted.
-- **Link** (`spaceteleop/link/emulator.py`): a UDP proxy with two independent directions, each a receive thread that samples a release time onto a heap and a drain thread that sends at release. Nothing is simulated in-process. Timer error is under 0.3 ms against 20–50 ms delays (network_emulation §2).
-- **Satellite** (`spaceteleop/sat/controller.py`): sequence-keyed buffer, strategy call every cycle at about 1 kHz, MuJoCo stepped up to wall clock, 30 Hz telemetry, keep-out and cage counters, applied-setpoint log.
-- **Sim** (`spaceteleop/sim/`): MuJoCo at zero gravity with the SO-100 from `robot_descriptions`. `capture`: a 16 mm box drifting at 2–4.5 cm/s and tumbling at 0.3–1 rad/s, a 20 mm capture envelope, a 50 mm target region held 0.2 s (SYNTHESIS §3 task 2). `peg`: a 60 mm peg, 6 mm radial clearance, unknown grasp offset up to 6 mm, and a jam rule that leaves the peg behind on fixture contact (SYNTHESIS §3 task 5). `capture_chain` adds a dead-band tether and two alternating targets. Both scenes carry a six-wall cage, 0.64 × 0.66 × 0.48 m, whose interior is the keep-out box (`spaceteleop/sim/__init__.py`).
-- **Strategy hook** (`spaceteleop/strategies/base.py`): `observe`, `ground_step` and `sat_step`. A hypothesis subclasses `Baseline` and is selected by `--strategy`; nothing else changes.
+- **Ground** (`spaceteleop/ground/`): hands the operator a frame `tau_h` old, sends 7-slot setpoints at 50 Hz, measures RTT from the echo.
+- **Link** (`spaceteleop/link/emulator.py`): a UDP proxy, two independent directions, each a receive thread that heaps a release time and a drain thread that sends at release. Timer error is under 0.3 ms against 20–50 ms delays (network_emulation §2).
+- **Satellite** (`spaceteleop/sat/controller.py`): sequence-keyed buffer, strategy call at about 1 kHz, MuJoCo stepped up to wall clock, 30 Hz telemetry, keep-out and cage counters, applied-setpoint log.
+- **Sim** (`spaceteleop/sim/`): MuJoCo at zero gravity with the SO-100. `capture`: a 16 mm box drifting at 2–4.5 cm/s and tumbling at 0.3–1 rad/s, a 20 mm capture envelope, a 50 mm target held 0.2 s. `peg`: a 60 mm peg, 6 mm radial clearance, unknown grasp offset up to 6 mm, a jam rule on fixture contact. `capture_chain` adds a dead-band tether and alternating targets. A six-wall cage, 0.64 × 0.66 × 0.48 m, is the keep-out box.
+- **Strategy hook** (`spaceteleop/strategies/base.py`): `observe`, `ground_step`, `sat_step`. A hypothesis subclasses `Baseline` and is selected by `--strategy`.
 
 ### 7.2 What it models, and what it does not
 
@@ -270,7 +270,7 @@ Pure Python 3.12; mujoco, numpy and sgp4 are the only runtime dependencies (`pyp
 
 ### 7.3 Profiles
 
-All delays are one-way per direction. Loss is Gilbert-Elliott; jitter is a mean-zero distribution of the stated SD (SYNTHESIS §7).
+One-way delays per direction; Gilbert-Elliott loss; mean-zero jitter of the stated SD (SYNTHESIS §7).
 
 | Parameter | `zero` | `direct_gs` | `leo_relay` | `geo_relay` |
 |---|---|---|---|---|
@@ -287,20 +287,13 @@ All delays are one-way per direction. Loss is Gilbert-Elliott; jitter is a mean-
 
 ### 7.4 Safety criterion
 
-Zero unsafe-motion events across all episodes on all four named profiles (SYNTHESIS §6). Unsafe motion is any of four counts, measured, not asserted (`spaceteleop/metrics/__init__.py`):
-
-- `move_in_hold`: the commanded setpoint changed while in hold;
-- `vel_over`: an emitted joint velocity above the clamp, on the satellite's applied-setpoint log;
-- `keepout`: the end effector left the cage interior;
-- `cage`: the arm touched the cage.
-
-`hold`, `retract`, `ramp_clip`, `pos_clamp`, `jams` and `stale` are diagnostics.
+Zero unsafe-motion events across all episodes on all four named profiles (SYNTHESIS §6). Four counts, measured on the satellite's applied log, not asserted (`spaceteleop/metrics/__init__.py`): `move_in_hold`, the setpoint changed while in hold; `vel_over`, an emitted joint velocity above the clamp; `keepout`, the end effector left the cage interior; `cage`, the arm touched the cage. `hold`, `retract`, `ramp_clip`, `pos_clamp`, `jams` and `stale` are diagnostics.
 
 ### 7.5 Acceptance criterion
 
-Solved means: on `leo_relay`, success ≥ 80 % of zero-latency success AND demos per hour ≥ 80 % of zero-latency demos per hour, with the safety criterion met on every profile (SYNTHESIS §6). The bar is a real discriminator: coarse pick-and-place throughput is 69 % of zero-latency at 250 ms and 49 % at 500 ms (teleop_fundamentals §1.2). The 163 ms relay machine loop sits under the 200 ms "ideal" bound for precision, so 80 % is expected to hold for coarse tasks and fail for insertion-class tasks with the baseline (SYNTHESIS §6). On `direct_gs` throughput is reported per pass, because every prior program was window-limited once delay was under about 1 s (space_teleop_prior_art §Implication). Smoothness is reported and never gated.
+Solved means: on `leo_relay`, success ≥ 80 % of zero-latency success AND demos per hour ≥ 80 % of zero-latency, with the safety criterion met on every profile (SYNTHESIS §6). The bar discriminates: coarse pick-and-place throughput is 69 % of zero-latency at 250 ms and 49 % at 500 ms (teleop_fundamentals §1.2), so 80 % is expected to hold for coarse tasks and fail for insertion-class tasks with the baseline (SYNTHESIS §6). On `direct_gs` throughput is reported per pass (space_teleop_prior_art §Implication). Smoothness is reported, never gated.
 
-Two throughput metrics exist. `demos_per_hour` is 3600 over the mean wall time of successful episodes. `demos_per_hour_gross` charges every episode, failures and the teleoperated reset included (data_pipeline §3.2). Only the second moves under H20.
+`demos_per_hour` is 3600 over the mean wall time of successful episodes; `demos_per_hour_gross` charges every episode, failures and teleoperated reset included (data_pipeline §3.2). Only the second moves under H20.
 
 ---
 
@@ -308,31 +301,31 @@ Two throughput metrics exist. `demos_per_hour` is 3600 over the mean wall time o
 
 ### 8.1 Pool and abstentions
 
-Twenty slots across five axes: link path (L), transport (T), latency-hiding control (C), operator interface and workflow (O), task and data design (D) (SYNTHESIS §10). Seven returned a measured abstention, a "NO HYPOTHESIS" verdict with the argument written out: H03, H04, H05, H06, H13, H17 and H18 (selection.md §1). Each found the mechanism already owed to the baseline, the effect bounded below the 10 % bar on the acceptance profile, or a measured null. H13, for example, measured the baseline in the repo, found the whole `leo_relay` penalty under 5 % of throughput, and identified the one way a phantom display "wins" here as an artefact against the operator model, not the link (docs/hypotheses/H13.md). That rule became a rejection clause for two selected hypotheses.
+Twenty slots across five axes: link path (L), transport (T), latency-hiding control (C), operator interface (O), task and data design (D) (SYNTHESIS §10). Seven returned a measured abstention with the argument written out: H03, H04, H05, H06, H13, H17 and H18 (selection.md §1). H13, for example, measured the baseline in the repo, found the whole `leo_relay` penalty under 5 % of throughput, and showed that a phantom display "wins" here only as an artefact against the operator model (docs/hypotheses/H13.md). That rule became a rejection clause for two selected hypotheses.
 
 ### 8.2 Verifier scoring
 
-Five verifiers, one per axis, scored every hypothesis on five 1–5 columns, evidence, testability, expected gain, cost (5 is cheap) and independence, out of 25 (docs/hypotheses/scores_V1.md). They spot-checked sources, reproduced arithmetic, and twice reproduced geometry with the repo's own `orbit.py`. The selection adjusted scores only for a stated reason and read every candidate against the working tree, which already contained most of what verifiers called "owed to the baseline": sequence keying, the (c) envelopes, the applied log, the unsafe-motion counts, the 20 mm envelope, the `peg` task and the §7 profiles (selection.md, opening table).
+Five verifiers, one per axis, scored each hypothesis on evidence, testability, expected gain, cost (5 is cheap) and independence, 1–5 each, out of 25 (docs/hypotheses/scores_V1.md). They spot-checked sources, reproduced arithmetic, and twice reproduced geometry with the repo's `orbit.py`. The selection adjusted scores only for a stated reason and read every candidate against the working tree, which already contained most of what verifiers called "owed to the baseline" (selection.md, opening table).
 
-The fact that shaped the selection: on `leo_relay` the baseline sits near the ceiling on `capture`, so no hider can clear a +10 % bar on the acceptance profile with that task. The discriminating cells are the sweep from about 250 ms up, `geo_relay`, and `peg`. Every hider is therefore read as a shift of the success-versus-RTT knee (selection.md, opening).
+The fact that shaped the selection: on `leo_relay` the baseline sits near the ceiling on `capture`, so no hider can clear a +10 % bar there. The discriminating cells are the sweep from about 250 ms up, `geo_relay`, and `peg`; every hider is read as a shift of the success-versus-RTT knee (selection.md, opening).
 
 ### 8.3 The five selected strategies
 
-Five hypotheses on three axes, C, O and D. No link-path or transport hypothesis survived its verifier on a primary metric; both axes reduced to baseline engineering plus one appendix sweep (selection.md §2). Each fits the `Strategy` seams in about 100 lines and is falsified by the same matrix.
+Five hypotheses on axes C, O and D; no link-path or transport hypothesis survived its verifier on a primary metric (selection.md §2). Each fits the `Strategy` seams in about 100 lines.
 
-**H10 `Twin` (arm T), merges H09.** The operator looks at a ground twin instead of delayed telemetry. The arm half shows the setpoint the ground itself sent at `now − tau_h`, since the arm's near future is fixed by the setpoints in flight; the object half extrapolates a finite-difference velocity over the lag the command still has to travel. It falls back to the raw frame during a hold or when the echo stalls (`spaceteleop/strategies/twin.py`). It attacks the whole machine loop on the operator's view, link 48 plus playout 30 plus dwell 17 ms, and the object chase error that fails capture at the 20 mm envelope (selection.md §2). Reject if: at `geo_relay` or any sweep point ≥ 500 ms demos per hour < 1.10× baseline; success below baseline anywhere; any unsafe-motion event or hold increase; jerk or SAL worse by > 20 %; or a gain on the `zero` cell beyond the seed spread, which would be a gain against the operator model (selection.md §3). `peg` reads as the arm-twin result, `capture` as the object result.
+**H10 `Twin` (arm T), merges H09.** The operator looks at a ground twin instead of delayed telemetry: the arm half shows the setpoint the ground itself sent at `now − tau_h`, the object half extrapolates a finite-difference velocity over the lag the command still has to travel, and both fall back to the raw frame during a hold or a stalled echo (`spaceteleop/strategies/twin.py`). It attacks the machine loop on the operator's view, link 48 plus playout 30 plus dwell 17 ms, and the object chase error that fails capture at the 20 mm envelope (selection.md §2). Reject if: at `geo_relay` or any sweep point ≥ 500 ms demos per hour < 1.10× baseline; success below baseline anywhere; any unsafe-motion event or hold increase; jerk or SAL worse by > 20 %; or a gain on the `zero` cell beyond the seed spread, which would be a gain against the operator model (selection.md §3).
 
-**H12 `DeadReckon` (arm D), merges H08.** The satellite fits a least-squares line over the last K = 8 setpoints in sequence time, never arrival time, and evaluates it L = 60 ms ahead of the newest packet, which is negative playout delay. Past a 100 ms horizon the baseline freeze takes over, and the result runs through the inherited hold, retract, ramp and clamp tail (`spaceteleop/strategies/deadreckon.py`). It attacks uplink plus playout, 60 of the 163 ms machine loop, from the satellite side, with no perception, so it is "supervisor-side extrapolation" and not the onboard-compute branch (selection.md §2). Reject if: at the best L on `leo_relay` demos per hour is not ≥ 10 % above baseline with the CI excluding zero, or success falls > 3 points, or any unsafe-motion event, or jerk > 2× baseline, or measured lag reduction < 0.5·L. The `leo_relay` clause is expected to reject from the ceiling; the hider is confirmed only if the knee moves right by ≥ 0.5·L with the CI excluding zero (selection.md §3).
+**H12 `DeadReckon` (arm D), merges H08.** The satellite fits a least-squares line over the last 8 setpoints in sequence time, never arrival time, and evaluates it 60 ms ahead of the newest packet, negative playout delay. Past a 100 ms horizon the baseline freeze takes over and the result runs through the inherited hold, retract, ramp and clamp tail (`spaceteleop/strategies/deadreckon.py`). It attacks uplink plus playout, 60 of the 163 ms machine loop, with no perception, so it is supervisor-side extrapolation and not the onboard-compute branch (selection.md §2). Reject if: at the best L on `leo_relay` demos per hour is not ≥ 10 % above baseline with the CI excluding zero, or success falls > 3 points, or any unsafe-motion event, or jerk > 2× baseline, or measured lag reduction < 0.5·L. The `leo_relay` clause is expected to reject from the ceiling; the hider is confirmed only if the knee moves right by ≥ 0.5·L (selection.md §3).
 
-**H14 `Gain` (arm G).** Scale the operator's Cartesian speed by the loop delay it is closing through. The operator's servo through delay L is the delayed integrator x' = −K·x(t − L), oscillatory above K·L = 1/e; pinning K·L at the `zero` value replaces overshoot-and-chase with a slower continuous approach. It scales the operator's speed, not the wire setpoint, which would measure windup instead (`spaceteleop/strategies/adaptive_gain.py`). It attacks the chase instability from about 250 ms at the 20 mm envelope (selection.md §2). Reject if: at 400 and 500 ms and on `peg`, success ≤ baseline + 10 points or demos per hour < 1.1× baseline; on `leo_relay` demos per hour < 0.9× baseline; the `zero`-cell control as for H10; and knock-away counts must fall where success rises (selection.md §3).
+**H14 `Gain` (arm G).** Scale the operator's Cartesian speed by the loop delay it is closing through. The servo through delay L is the delayed integrator x' = −K·x(t − L), oscillatory above K·L = 1/e; pinning K·L at the `zero` value replaces overshoot-and-chase with a slower continuous approach. It scales the operator's speed, not the wire setpoint, which would measure windup (`spaceteleop/strategies/adaptive_gain.py`). Reject if: at 400 and 500 ms and on `peg`, success ≤ baseline + 10 points or demos per hour < 1.1× baseline; on `leo_relay` demos per hour < 0.9× baseline; the `zero`-cell control as for H10; and knock-away counts must fall where success rises (selection.md §3).
 
-**H11 `Terminal` (arm P) with `TerminalGround` ablation (arm Pg). This is the onboard-compute branch.** The operator produces every approach and carry; delegated is only the segment latency destroys, the last ≤ 8 cm of a capture after the operator's own jaw-close command, or the last millimetres of an insertion after the commanded descent begins, bounded to 2 s. One damped-least-squares step per cycle from the true joint state at ≤ 7 cm/s, then a crossfade back onto the operator's stream so the hand-back never jumps. `Terminal` runs on the satellite from ground-truth pose, an upper bound on any estimator; `TerminalGround` runs the identical code on the ground from delayed telemetry; P − Pg is the measured value of onboard compute (`spaceteleop/strategies/terminal.py`). It attacks SYNTHESIS §6's predicted failure, the insertion or grasp event, and is the one thing SYNTHESIS §Implication says to run first (selection.md §2). Reject if, on `peg` `leo_relay` and `capture` ≥ 500 ms: success gain < 10 points with the CI covering zero, or demos-per-hour gain < 10 %; any unsafe-motion event; robot-executed frames > 25 % of successful episodes; the ground ablation within 5 points of onboard; or SAL and LDLJ worse than baseline (selection.md §3). The flight cost, a Jetson pose estimator and a Jetson-to-supervisor path, is reported next to the result.
+**H11 `Terminal` (arm P) with `TerminalGround` ablation (arm Pg). This is the onboard-compute branch.** The operator produces every approach and carry; delegated is only the segment latency destroys, the last ≤ 8 cm of a capture after the operator's own jaw-close command or the last millimetres of an insertion, bounded to 2 s, at ≤ 7 cm/s, with a crossfade back onto the operator's stream so the hand-back never jumps. `Terminal` runs on the satellite from ground-truth pose, an upper bound on any estimator; `TerminalGround` runs the identical code on the ground from delayed telemetry; P − Pg is the measured value of onboard compute (`spaceteleop/strategies/terminal.py`). It attacks SYNTHESIS §6's predicted failure, the insertion or grasp event (selection.md §2). Reject if, on `peg` `leo_relay` and `capture` ≥ 500 ms: success gain < 10 points with the CI covering zero, or demos-per-hour gain < 10 %; any unsafe-motion event; robot-executed frames > 25 % of successful episodes; the ground ablation within 5 points of onboard; or SAL and LDLJ worse than baseline (selection.md §3). The flight cost, a Jetson pose estimator and a Jetson-to-supervisor path, is reported next to the result.
 
-**H20 `capture_chain` (arm C versus Cr), merges H15 and H16.** The demonstration ends with a re-release that seeds the next one, targets alternating A to B, so there is no canonical reset. A dead-band tether keeps the box in the working volume at zero force inside it. Arm Cr runs the same task with a canonical teleoperated reset: the same operator instance carries the box back to the spawn zone through the real link, and that time is charged (`spaceteleop/sim/__init__.py`; `spaceteleop/ground/operators.py`). It attacks reset wall time, which `demos_per_hour` charges at zero, and supplies the honest reset model the gross metric needs for every arm (selection.md §2). Reject if: chained gross demos per hour at `leo_relay` < 1.10× canonical, or success < 0.90×, or any unsafe-motion event, or SAL and LDLJ worse than the seed spread, because the release must not turn demonstrations into chases (selection.md §3). The tether-taut row fraction makes the "free 6-DoF" subset countable.
+**H20 `capture_chain` (arm C versus Cr), merges H15 and H16.** The demonstration ends with a re-release that seeds the next one, targets alternating, so there is no canonical reset; a dead-band tether keeps the box in the working volume at zero force. Arm Cr runs the same task with a canonical teleoperated reset by the same operator instance through the real link, and that time is charged (`spaceteleop/sim/__init__.py`). It attacks reset wall time, which `demos_per_hour` charges at zero, and supplies the honest reset model the gross metric needs (selection.md §2). Reject if: chained gross demos per hour at `leo_relay` < 1.10× canonical, or success < 0.90×, or any unsafe-motion event, or SAL and LDLJ worse than the seed spread, because the release must not turn demonstrations into chases (selection.md §3).
 
 ### 8.4 Experiment matrix
 
-Common settings: 50 Hz commands, 30 Hz telemetry, 20 s episodes (30 s for `peg` and every ≥ 500 ms cell), `tau_h` 0.17 s, same seeds across arms within a cell, one `run.py` process per cell (selection.md §3). Eleven profiles: the four named plus `sweep:{0, 100, 250, 400, 500, 750, 1000}`.
+Common settings: 50 Hz commands, 30 Hz telemetry, 20 s episodes (30 s for `peg` and ≥ 500 ms cells), `tau_h` 0.17 s, same seeds across arms, one process per cell (selection.md §3). Eleven profiles: the four named plus `sweep:{0, 100, 250, 400, 500, 750, 1000}`.
 
 | Block | Task | Arms | Profiles | tau_h | Cells |
 |---|---|---|---|---|---|
@@ -341,7 +334,7 @@ Common settings: 50 Hz commands, 30 Hz telemetry, 20 s episodes (30 s for `peg` 
 | C | capture_chain free / teleop reset | C, Cr | zero, direct_gs, leo_relay, sweep:250, sweep:500, sweep:1000 | 0.17 | 12 |
 | E | capture, peg | B, T, D, G, P | leo_relay, sweep:400, geo_relay | 0.25 | 30 |
 
-Tier 1 is 174 cells × 30 seeds = 5,220 episodes, about 17 h serial or 4 h on five processes. Tier 2 confirms at 100 paired seeds on the sweep cell nearest the baseline knee plus each file's gating cell, about 2,700 episodes. A 10-point unpaired difference needs about 250 episodes per arm; same-seed pairing turns it into a McNemar test, and 100 paired seeds gives ≥ 80 % power for 10 points at ≤ 15 % discordance (selection.md §3). The achieved CI is always stated.
+Tier 1 is 174 cells × 30 seeds = 5,220 episodes, about 4 h on five processes. Tier 2 confirms at 100 paired seeds on the cell nearest the baseline knee plus each file's gating cell. Same-seed pairing turns a 10-point difference into a McNemar test with ≥ 80 % power at ≤ 15 % discordance (selection.md §3). The achieved CI is always stated.
 
 ### 8.5 What was rejected and why
 
@@ -367,7 +360,7 @@ Tier 1 is 174 cells × 30 seeds = 5,220 episodes, about 17 h serial or 4 h on fi
 
 ## 9. Results
 
-All numbers in this section come from `docs/experiments/results.md`, `results.json` and `paired.md` produced by `experiments/aggregate.py`. Nothing below is filled in until the matrix has finished.
+All numbers here come from `docs/experiments/results.md`, `results.json` and `paired.md`, written by `experiments/aggregate.py` once the matrix has finished.
 
 ### 9.1 Success versus RTT, per task and arm
 
@@ -382,7 +375,7 @@ All numbers in this section come from `docs/experiments/results.md`, `results.js
 | P terminal (onboard branch, upper bound) | | | | | | | | | | |
 | Pg terminal ground (ablation) | | | | | | | | | | |
 
-One table each for `capture` and `peg`; cells are success rate with a 95 % Wilson CI and n, then demos per hour, then RTT p50 / p95 measured from the echo.
+One table each for `capture` and `peg`: success with 95 % Wilson CI, demos per hour, RTT p50 / p95.
 
 ### 9.2 Acceptance readout, SYNTHESIS §6
 
@@ -410,7 +403,7 @@ Per-pass throughput on `direct_gs` is listed separately.
 | Task | Profile | Arm vs B | Paired success difference | Discordant seeds | McNemar exact p | Demos/h ratio, paired bootstrap 95 % CI |
 |---|---|---|---|---|---|---|
 
-Per hypothesis, the mechanism checks: twin innovation per frame (T), measured command-to-applied lag by cross-correlation against the applied log (D), knock-away counts (G, T), assist frame fraction and hand-back velocity peak with `ramp_clip(P) ≤ ramp_clip(B)` and `vel_over = 0` (P), and the P − Pg difference.
+Mechanism checks per hypothesis: twin innovation (T), command-to-applied lag by cross-correlation (D), knock-away counts (G, T), assist fraction and hand-back peak with `vel_over = 0` (P), and P − Pg.
 
 ### 9.5 H20 gross throughput
 
@@ -434,24 +427,22 @@ SAL, LDLJ and stall fraction per arm and profile against the zero-latency baseli
 
 ## 10. Verification
 
-An independent audit reads the raw `summary.json` files, recomputes the aggregate tables from the per-seed vectors in `results.json`, checks every acceptance and rejection clause in selection.md §3 against the numbers, and confirms that the four unsafe-motion counts are zero on the four named profiles for every arm.
+An independent audit recomputes the aggregate tables from the per-seed vectors in `results.json`, checks every clause in selection.md §3 against the numbers, confirms zero unsafe-motion counts on the four named profiles for every arm, and lists crashed or retried cells and any mechanism check that failed where the headline metric passed.
 
 `{{RESULTS:audit_summary}}`
-
-The audit also states which cells were skipped or crashed and retried by the resumable matrix runner, and whether any strategy's mechanism check failed even where its headline metric passed.
 
 ---
 
 ## 11. Near-future upgrades and what they change
 
-- **Starlink third-party laser terminal, Q1 2027.** Muon Space's Halo flies in Q1 2027 and Starcloud's within a year of May 2026 (leo_link_options §2 b1). A measured latency and a published mass, power, price and allocation would settle SYNTHESIS §9 question 1. An RTT inside the 30–90 ms estimate changes nothing; above 150 ms the mission reverts to the pass regime and the 16U variant becomes competitive.
-- **Kepler's 2028 constellation.** Continuous coverage of a non-Kepler-plane satellite needs it (leo_link_options §2 b2). A published latency would make Kepler a real second path with SDA-standard terminals already shipping; optical ground stations stay weather-limited at about 69 % single-site, 93.6 % with three (hardware_landscape §6).
-- **Telesat Lightspeed and Amazon Leo.** Lightspeed slipped to 2028; Amazon has a NASA relay demonstration planned but no product (leo_link_options §2 b3, b4). Either adds a third relay vendor.
-- **Onboard compute branch.** If P − Pg is positive and large on `peg`, the flight cost is a Jetson pose estimator and a Jetson-to-supervisor path, both excluded by (c). The 5 mm noise plus 33 ms lag cell bounds a real estimator. No rad-tolerant board with hardware video encode exists off the shelf; Aitech's S-A2300 would be the first (hardware_landscape §5).
-- **Jitter distribution.** Only a 2–3 component Gaussian mixture is validated on Starlink (network_emulation §1.1). The emulator has a `dist` switch with exp, gauss, lognormal and gamma (`spaceteleop/link/profiles.py`); a GMM sampler and a sweep re-run is the cheapest sensitivity check not yet done.
-- **Radiation-screened cameras.** Teledyne e2v's Ruby 1.3M USV is tested to 10 and 20 krad (hardware_landscape §4) and replaces the IMX296 if COTS hot-pixel growth matters.
-- **Two-host operation.** One host makes one-way delay exact. Two hosts need RFC 7679 one-way delay with Moon–Skelly–Towsley skew removal, because RTT/2 is wrong by about 8 ms on Starlink (network_emulation §2).
-- **Direct-pass density.** A 45-site network gives about 64 % duty by the verifier's reproduction (docs/hypotheses/scores_V1.md), but about 1× per operator-hour because it needs three regional teams. A schedule hedge, not a throughput gain.
+- **Starlink third-party laser terminal, Q1 2027.** Muon Space's Halo flies in Q1 2027 (leo_link_options §2 b1). A measured latency and published mass, power, price and allocation settle SYNTHESIS §9 question 1. An RTT inside 30–90 ms changes nothing; above 150 ms the mission reverts to the pass regime and the 16U variant becomes competitive.
+- **Kepler's 2028 constellation.** Needed for continuous coverage of a non-Kepler-plane satellite (leo_link_options §2 b2); a published latency makes Kepler a real second path.
+- **Telesat Lightspeed and Amazon Leo.** 2028 service and a NASA demonstration respectively; no product yet (leo_link_options §2 b3, b4).
+- **Onboard compute branch.** If P − Pg is positive and large on `peg`, the flight cost is a Jetson pose estimator and a Jetson-to-supervisor path, both excluded by (c). No rad-tolerant board with hardware video encode exists off the shelf (hardware_landscape §5).
+- **Jitter distribution.** Only a 2–3 component Gaussian mixture is validated on Starlink (network_emulation §1.1). The emulator's `dist` switch has exp, gauss, lognormal and gamma; a GMM sampler and a sweep re-run is the cheapest sensitivity check not yet done.
+- **Radiation-screened cameras.** Teledyne e2v's Ruby 1.3M USV is tested to 20 krad (hardware_landscape §4) and replaces the IMX296 if COTS hot-pixel growth matters.
+- **Two-host operation.** Two hosts need RFC 7679 one-way delay with skew removal, because RTT/2 is wrong by about 8 ms on Starlink (network_emulation §2).
+- **Direct-pass density.** A 45-site network gives about 64 % duty (docs/hypotheses/scores_V1.md) but about 1× per operator-hour, since it needs three regional teams. A schedule hedge, not a throughput gain.
 
 ---
 
@@ -459,25 +450,25 @@ The audit also states which cells were skipped or crashed and retried by the res
 
 Ranked by design impact (SYNTHESIS §9).
 
-1. **Measured latency and terms for a third-party satellite over Starlink mini-laser.** No measurement exists; mass, power, price, ITAR status and ground-side allocation are unpublished. This decides whether the primary path is real.
-2. **Kepler latency and coverage of a non-Kepler-plane satellite.** Only "sub-second" from trade press; the datasheet's 95 % continuity and leo_link_options' "intermittent" estimate are unresolved.
-3. **Radiation behaviour of COTS servos and the on-orbit Jetson reboot rate.** No TID or SEE data for Dynamixel or Feetech; no operator publishes Jetson reboot statistics.
-4. **Does latency-collected demonstration data train worse policies?** No study collects demonstrations at controlled latency and reports policy success (data_pipeline §2.3). The link runs only through operator-quality proxies such as robomimic's proficiency result.
-5. **Jitter distribution shape on Starlink.** The uplink one-way sum of 52 + 35 ms from idle probes also exceeds the 40 ms RTT median from M-Lab, and which dataset describes a laser-relayed satellite is unknown.
-6. **Ground backhaul latency from any provider, and continuous-transmit thermal qualification of CubeSat X-band radios.**
+1. **Measured latency and terms for a third-party satellite over Starlink mini-laser.** Nothing is measured or published. This decides whether the primary path is real.
+2. **Kepler latency and coverage of a non-Kepler-plane satellite.** Only "sub-second" from trade press; continuity is disputed between reports.
+3. **Radiation behaviour of COTS servos and the on-orbit Jetson reboot rate.** No TID or SEE data for Dynamixel or Feetech; no published Jetson reboot statistics.
+4. **Does latency-collected demonstration data train worse policies?** No study collects demonstrations at controlled latency and reports policy success (data_pipeline §2.3); the link runs only through operator-quality proxies.
+5. **Jitter distribution shape on Starlink**, and which dataset describes a laser-relayed satellite.
+6. **Ground backhaul latency from any provider**, and continuous-transmit thermal qualification of CubeSat X-band radios.
 7. **Packet reordering and ISL stage effects on relayed paths.**
 8. **Capture task limits.** Safe release spin rate and target speed are rules of thumb `[unverified]` (unique_data_study §4).
-9. **LeRobot loader tolerance** for a missing `stats/*` block and for sidecar files (data_pipeline §1.5, §3.2).
+9. **LeRobot loader tolerance** for a missing `stats/*` block and sidecar files (data_pipeline §1.5, §3.2).
 
-**Honest limits of the testbed.** Things the testbed cannot show, distinct from the research questions above.
+**Honest limits of the testbed.**
 
-- **Grasp physics.** The grasp is kinematic and MuJoCo has no restitution, so the grasp-impulse transients that make task 2 unique are absent. Capture success-versus-latency is a lower bound on real failure (SYNTHESIS §3; unique_data_study §5).
-- **The operator is a model.** Fixed reaction delay, no move-and-wait, no learning, no fatigue. Whether its knee lands where human curves put it, ×1.45 at 250 ms and ×2.04 at 500 ms, is what §9 reports; a mismatch indicts the model, not the humans.
-- **Video is bytes.** Compression, frame drops and stereo have no perceptual model, and VISTA shows success falling from 97 % to 35 % as bandwidth, delay and loss co-vary (multi_operator_bandwidth §1.3).
-- **One host, one clock, one interpreter.** One-way delay is exact only because both ends share a clock. Threads share the GIL, so `--arms 4` measures the interpreter as much as the link; the matrix runs one arm per process for that reason.
-- **No force.** No wrist force/torque and no contact detection beyond the sim's predicates, so nothing on delayed contact detection as a safety risk (teleop_fundamentals §4).
-- **Unique-value tasks are absent.** Granular, liquid and deformable tasks have no MuJoCo proxy. The testbed proves the loop and the envelopes on two rigid-body proxies only.
-- **`ramp_clip` is not a safety count.** A 1 kHz loop rendering a 50 Hz jittered stream clips thousands of times per episode even for the baseline; the decidable pair is `ramp_clip(P) ≤ ramp_clip(B)` on the same seeds and `vel_over = 0` (`spaceteleop/strategies/terminal.py`).
+- **Grasp physics.** The grasp is kinematic and MuJoCo has no restitution, so the grasp-impulse transients that make task 2 unique are absent; capture results are a lower bound (SYNTHESIS §3).
+- **The operator is a model.** Fixed reaction delay, no move-and-wait, no learning, no fatigue; a knee that lands away from the human curves indicts the model.
+- **Video is bytes.** No perceptual model of compression or frame drops; VISTA shows success falling from 97 % to 35 % as bandwidth, delay and loss co-vary (multi_operator_bandwidth §1.3).
+- **One host, one clock, one interpreter.** One-way delay is exact only because both ends share a clock, and `--arms 4` measures the GIL as much as the link.
+- **No force.** No wrist force/torque, so nothing on delayed contact detection as a safety risk (teleop_fundamentals §4).
+- **Unique-value tasks are absent.** Granular, liquid and deformable tasks have no MuJoCo proxy; the testbed proves the loop and the envelopes on two rigid-body proxies.
+- **`ramp_clip` is not a safety count.** A 1 kHz loop rendering a 50 Hz jittered stream clips thousands of times per episode even for the baseline; the decidable pair is `ramp_clip(P) ≤ ramp_clip(B)` and `vel_over = 0` (`spaceteleop/strategies/terminal.py`).
 
 ---
 

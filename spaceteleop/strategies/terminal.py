@@ -129,7 +129,10 @@ class _Prim(Baseline):
     def _step(self, m, q, obj, grasped, won, cmd, dt, alive, tgt, seed):
         """Primitive, then hand-back. `tgt` is what the operator would command; the
         crossfade ends ON it, so the baseline resumes with no step to ramp away."""
-        self._n += 1
+        # F7: the assist denominator is the cycles of the DEMONSTRATION. Once the episode is
+        # won the ground stops sending and the satellite lingers ~0.7 s; counting those
+        # would dilute assist_frac by however long the linger happened to be.
+        self._n += not won
         self._hb = False
         out = self._run(m, q, obj, grasped, won, cmd, dt, alive, seed) if alive else None
         if out is not None:

@@ -12,6 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 from spaceteleop.strategies.adaptive_gain import Gain
+from spaceteleop.strategies.baseline import Baseline
 from spaceteleop.strategies.deadreckon import JAW, DeadReckon
 from spaceteleop.strategies.twin import Twin
 
@@ -60,11 +61,18 @@ def test_deadreckon_fits_in_sequence_time_not_arrival_time():
     now = time.monotonic()
     burst = [(now, s, [0.02 * s] * 5 + [0.3, 0.0]) for s in range(8)]
     out = dr._playout(burst, now - dr.interp_s)
-    # t* = seq_n/cmd_hz + age(0) + L = 0.14 + 0.060 -> 0.20 rad on the 1.0 rad/s line
-    assert out[0] == pytest.approx(0.20, abs=1e-9)
+    # t* = seq_n/cmd_hz + age(0) - interp_s + L = 0.14 - 0.030 + 0.060 -> 0.17 rad on the
+    # 1.0 rad/s line (audit F1: the evaluation instant used to omit the - interp_s).
+    assert out[0] == pytest.approx(0.17, abs=1e-9)
     assert out[JAW] == 0.3                               # the jaw is never extrapolated
-    assert DeadReckon(cmd_hz=50.0, L=0.030)._playout(burst, now - dr.interp_s)[0] == \
-        pytest.approx(0.17, abs=1e-9)
+
+    # lead over the baseline playout is EXACTLY L, on a buffer whose arrivals are spaced
+    # like the real thing (the degenerate burst above has no arrival-time playout at all)
+    spaced = [(now - (7 - s) * 0.02, s, [0.02 * s] * 5 + [0.3, 0.0]) for s in range(8)]
+    base = Baseline()._playout(spaced, now - dr.interp_s)
+    for lead in (0.060, 0.030, 0.0):
+        o = DeadReckon(cmd_hz=50.0, L=lead)._playout(spaced, now - dr.interp_s)
+        assert o[0] - base[0] == pytest.approx(lead, abs=1e-9)    # L = 0 IS the baseline
 
     stale = [(now - 0.5, s, sp) for _, s, sp in burst]   # age 0.5 s > H = 0.1
     assert dr._playout(stale, now - dr.interp_s) == stale[-1][2]
@@ -88,7 +96,26 @@ def test_gain_scales_operator_speed_down_as_rtt_rises_and_never_below_zero():
             t = tel(seq=seq, rtt_ms=(rtt + g.tau_h) * 1000)
             assert g.ground_step(t, target) == target    # the wire is never touched
         speeds.append(op.speed)
+    # L0 is the MEASURED zero-latency loop (audit F5), not a 0.29 constant
+    assert g.L0 == pytest.approx(0.030 + 0.5 / 30.0 + 0.17 + Gain.RTT0, abs=1e-9)
     assert speeds[0] == 0.07                             # L_hat 0.20 < L0 -> s = 1, no scaling
     assert all(b < a for a, b in zip(speeds, speeds[1:]))
     assert all(s > 0 for s in speeds)
-    assert speeds[-1] == pytest.approx(0.07 * 0.29 / (5.0 + 0.03 + 0.17), rel=0.05)
+    assert speeds[-1] == pytest.approx(0.07 * g.L0 / (5.0 + 0.03 + 0.17), rel=0.05)
+
+
+def test_gain_does_not_compound_across_chained_episodes():
+    """F6: `capture_chain` reuses one operator, so a fresh Gain per episode must take the
+    operator's ORIGINAL speed as its reference, never the previous episode's scaled one."""
+    op = SimpleNamespace(speed=0.07)
+    seq = 0
+    for _ in range(3):                                   # three chained episodes
+        g = Gain(operator=op, tau_h=0.17, tel_hz=30.0)
+        for _ in range(120):
+            seq += 1
+            g.ground_step(tel(seq=seq, rtt_ms=(1.0 + g.tau_h) * 1000), [0.4] * 7)
+    one = Gain(operator=SimpleNamespace(speed=0.07), tau_h=0.17, tel_hz=30.0)
+    for k in range(120):
+        one.ground_step(tel(seq=k + 1, rtt_ms=(1.0 + one.tau_h) * 1000), [0.4] * 7)
+    assert op.speed == pytest.approx(one.operator.speed, rel=1e-6)
+    assert op.speed0 == 0.07

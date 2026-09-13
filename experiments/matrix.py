@@ -47,6 +47,14 @@ TIER1 = {
                      "capture_chain_teleop": ["--reset", "teleop"]}),
     "E": dict(tasks=["capture", "peg"], arms="primary", tau_h=0.25,
               profiles=["leo_relay", "sweep:400", "geo_relay"]),
+    # S = the dropout block (audit T02). Poisson 1.7/h puts an outage inside a 20 s episode
+    # 0.9 % of the time per direction, so blocks A/B never exercised hold or retract and
+    # "zero unsafe motion on dropout" (PROGRAM.md acceptance) was vacuous: move_in_hold = 0
+    # and vel_over = 0 because no hold ever started while an operator was driving. Both
+    # profiles force one full outage at t = 6.0 s; drop1 (1 s) trips hold and returns,
+    # drop12 (12 s) crosses the 10 s retract and the arm stows.
+    "S": dict(tasks=["capture", "peg"], arms="all", tau_h=PRIMARY_TAU,
+              profiles=["leo_relay_drop1", "leo_relay_drop12"]),
 }
 
 # Tier 2 confirm template, keyed by the selection.md arm label. Provisional by construction
@@ -80,8 +88,12 @@ class Cell(NamedTuple):
 
 
 def max_s(task, profile):
-    """selection.md section 3: 20 s, 30 s for peg and for every cell at RTT >= 500 ms."""
-    return 30.0 if task.startswith("peg") or rtt_ms(profile) >= 500 else 20.0
+    """selection.md section 3: 20 s, 30 s for peg and for every cell at RTT >= 500 ms.
+
+    Block S's `leo_relay_drop12` also gets 30 s: its forced outage alone is 12 s of the
+    episode, and the operator cannot finish the task inside what a 20 s cap would leave."""
+    return 30.0 if (task.startswith("peg") or rtt_ms(profile) >= 500
+                    or profile.endswith("drop12")) else 20.0
 
 
 def _arms(role, strategies, ablations, baseline):
@@ -118,12 +130,16 @@ def cells(tier=1, blocks=None, strategies=("baseline",), seeds=30, profiles=None
 
 
 EP_RE = re.compile(r"arm (\d+) ep (\d+) seed (\d+) success=(True|False) ([\d.]+)s "
-                   r"rtt_p50=([\d.]+)ms hold=([\d.]+)s unsafe=(\d+) frames=(\d+)")
+                   r"rtt_p50=([\d.]+)ms hold=([\d.]+)s unsafe=(\d+) cage=(\d+) "
+                   r"stalls=(\d+) max_dt=([\d.]+)s frames=(\d+)")
 UNSAFE_RE = re.compile(r"^(\d+)\s+\((.*)\)$")
 
+# `cage` is reported apart from the unsafe (link-caused) counters, and `stalls`/`max_dt_s`
+# flag a cell that ran under CPU contention (audit T06, T07).
 TABLE_KEYS = {"profile", "episodes", "success_rate", "mean_duration_s", "demos_per_hour",
               "demos_per_hour_gross", "rtt_p50_ms", "rtt_p95_ms", "rtt_max_ms", "cmd_loss",
               "safety_hold_s", "jerk_sum_sq", "sal", "ldlj", "stall_frac", "unsafe_events",
+              "cage", "stalls", "max_dt_s",
               "diagnostics", "task", "wire_up_Bps", "wire_down_Bps", "nominal_rtt_ms"}
 
 
@@ -140,7 +156,8 @@ def parse_stdout(text):
     aggregate from the npz files (which carry no success flag or wall time)."""
     eps = [dict(arm=int(m[1]), ep=int(m[2]), seed=int(m[3]), success=m[4] == "True",
                 duration_s=float(m[5]), rtt_p50=float(m[6]), hold_s=float(m[7]),
-                unsafe=int(m[8]), frames=int(m[9]))
+                unsafe=int(m[8]), cage=int(m[9]), stalls=int(m[10]),
+                max_dt_s=float(m[11]), frames=int(m[12]))
            for m in EP_RE.finditer(text)]
     agg = {}
     for line in text.splitlines():
@@ -193,10 +210,14 @@ def run_cell(cell, root, seed0=0):
         err = f"exit {r.returncode}: " + ((r.stderr or out).strip().splitlines() or [""])[-1]
     elif not eps:
         err = "no episodes parsed from stdout"
+    # schema flags the aggregator reads: `duration_s` already ends at the success/done
+    # instant (audit T09/F2, run.py), and SAL/LDLJ/stall_frac already come from the
+    # satellite applied-setpoint sidecar (T05). Without these it would apply both
+    # corrections a second time.
     s = dict(cell._asdict(), name=cell.name, seed0=seed0, cmd=" ".join(cmd),
-             rtt_ms=rtt_ms(cell.profile),
+             rtt_ms=rtt_ms(cell.profile), linger_excluded=True,
              wall_s=round(time.monotonic() - t0, 1), error=err,
-             aggregate=agg, episodes=eps)
+             aggregate=dict(agg, smoothness_source="sat"), episodes=eps)
     with open(f"{d}/summary.json", "w") as f:
         json.dump(s, f, indent=1)
     return s

@@ -2,7 +2,8 @@
 
 Baseline renders the buffer as it stood `interp_s` ago, so the arm trails the operator's
 hand by uplink delay + playout. This fits a least-squares line over the last K setpoints and
-evaluates it `L` AHEAD of the newest packet, which is negative playout delay.
+evaluates it `L` ahead of where Baseline would have played it, which is negative playout
+delay. The lead over the baseline is exactly `L`: at L = 0 the two arms are identical.
 
 Time base is SEQUENCE, `t_i = seq_i / cmd_hz`, never arrival time. A burst of K packets
 draining out of the emulator after a jitter spike arrives with near-identical arrival stamps
@@ -40,7 +41,10 @@ class DeadReckon(Baseline):
         sp = np.array([p for _, _, p in w], float)
         tm, pm = ts.mean(), sp.mean(0)
         slope = np.clip((ts - tm) @ (sp - pm) / ((ts - tm) ** 2).sum(), -self.vmax, self.vmax)
-        out = pm + slope * (ts[-1] + age + self.L - tm)
+        # - interp_s so the lead over the baseline playout is EXACTLY L (audit F1): Baseline
+        # renders at `now - interp_s`, and without this the evaluation instant was
+        # `now + L`, i.e. a lead of L + 30 ms. L = 0 now really is the baseline.
+        out = pm + slope * (ts[-1] + age - self.interp_s + self.L - tm)
         out[JAW] = w[-1][2][JAW]             # the jaw is a step command, never extrapolated
         return out.tolist()
 

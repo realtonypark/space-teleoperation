@@ -62,10 +62,12 @@ def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.
     # "step up to wall clock" has to be measured from where this episode started.
     buf, t0, sim_t0 = [], time.monotonic(), d.time
     last_arr, last_seq, last_tsend, ncmd, reordered = None, 0, 0, 0, 0
+    last_flags = 0
     tel_seq, next_tel, tel_dt = 0, 0.0, 1.0 / tel_hz
     frame = b"\0" * frame_bytes
     hold_time, holds, done_at, success_at = 0.0, 0, None, None
     prev, t_applied, seen, satlog, ev = t0, 0, 0, [], None
+    done_i = None
     while True:
         while True:                                   # drain everything that arrived
             try:
@@ -82,7 +84,7 @@ def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.
             buf.append((now, c["seq"], c["setpoints"]))
             del buf[:-BUFLEN]
             last_arr, ncmd = now, ncmd + 1
-            last_seq, last_tsend = c["seq"], c["t_send"]
+            last_seq, last_tsend, last_flags = c["seq"], c["t_send"], c["flags"]
         now = time.monotonic()
         sp = strategy.sat_step(buf, now)
         held = strategy.held
@@ -94,12 +96,15 @@ def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.
         prev = now
         # the strategy ramp-limits against `now`; log the SAME instant or the
         # recorded velocity would be measured against a different clock reading
-        assist = bool(getattr(strategy, "assist", False))
+        # H11: the flag comes from whichever side ran the primitive. For Pg it rode up on
+        # the command (ground/loop), for P the satellite strategy sets it. Same column either
+        # way, so a training run can tell robot-executed frames from human ones for both.
+        assist = bool(getattr(strategy, "assist", False) or last_flags & F_ASSIST)
         satlog.append((int(now * 1e9), t_applied, last_seq, held, sp, assist,
                        bool(m.ntendon and d.ten_length[0] > sim.SLACK)))
         while d.time - sim_t0 < now - t0:             # step the sim up to wall clock
             if sim.step(m, d, sp, st, d.time) and done_at is None:
-                done_at = now
+                done_at, done_i = now, len(satlog)
         if st["success"] and success_at is None:
             success_at = now                          # H20: R is measured from here
         if now - t0 >= next_tel:
@@ -118,7 +123,7 @@ def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.
                                  t_applied, q, qd, sim.obj_pose(d, st), flags, frame),
                         down_addr)
         if done_at is None and now - t0 >= max_s + (RESET_MAX if success_at else 0.0):
-            done_at = now
+            done_at, done_i = now, len(satlog)
         if done_at is not None and ev is None:
             # freeze the counters at the end of the episode: the linger after `done_at` is
             # the ground having stopped sending, which would otherwise log a hold every run
@@ -129,9 +134,14 @@ def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.
         if stop is not None and stop():
             break
         time.sleep(0.001)
+    # the sidecar stops at done_at: everything past it is the linger, during which the
+    # ground has stopped sending and every cycle logs a hold (audit F12). Keeping it would
+    # put ~0.7 s of frozen setpoints into the smoothness and stall numbers (T05) and into
+    # the assist denominator (F7).
     return dict(success=st["success"], duration=min(d.time - sim_t0, max_s), cmds_rx=ncmd,
                 last_seq=last_seq, hold_time=hold_time, hold_steps=holds,
-                reordered=reordered, satlog=satlog, st=st, success_wall=success_at,
+                reordered=reordered, satlog=satlog[:done_i], st=st, success_wall=success_at,
+                done_wall=done_at,
                 released=st["done"],
                 reset_s=(done_at - success_at) if success_at and done_at else 0.0,
                 events=dict(ev or strategy.ev, stale=reordered),
