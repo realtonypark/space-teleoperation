@@ -134,8 +134,8 @@ def reset(m, d, seed, task="capture"):
     a, v = i["qadr"], i["vadr"]
     d.qpos[a + 3:a + 7] = [1, 0, 0, 0]
     st = dict(ids=i, task=task, grasped=False, off=np.zeros(3), in_region_since=None,
-              success=False, jammed=False, jams=0, keepout=0, cage_hits=0,
-              t_out=None, t_hit=None)
+              success=False, jammed=False, jams=0, keepout=0, cage_hits=0, knockaway=0,
+              t_out=None, t_hit=None, t_knock=None, v0=0.0)
     if task == "peg":
         st["pin"], st["left"] = None, False
         mujoco.mj_forward(m, d)
@@ -157,6 +157,7 @@ def reset(m, d, seed, task="capture"):
     d.qvel[v:v + 3] = u / np.linalg.norm(u) * rng.uniform(*DRIFT)
     w = rng.normal(size=3)
     d.qvel[v + 3:v + 6] = w / np.linalg.norm(w) * rng.uniform(*TUMBLE)
+    st["v0"] = float(np.linalg.norm(d.qvel[v:v + 3]))          # the drift it was born with
     mujoco.mj_forward(m, d)
     return st
 
@@ -187,7 +188,7 @@ def _edge(st, key, on, t):
     if on:
         last = st["t_" + key]
         if last is None or t - last > EVENT_GAP:
-            st[{"out": "keepout", "hit": "cage_hits"}[key]] += 1
+            st[{"out": "keepout", "hit": "cage_hits", "knock": "knockaway"}[key]] += 1
         st["t_" + key] = t
     return on
 
@@ -218,6 +219,12 @@ def _capture(m, d, st, gp, t):
             mujoco.mj_forward(m, d)
     elif closing and np.linalg.norm(d.qpos[a:a + 3] - gp) < GRASP_TOL:
         st["grasped"], st["off"] = True, d.qpos[a:a + 3] - gp   # reel the offset in
+    # H14 mechanism check: the arm swept through the box and sent it off. "Faster than
+    # 3 cm/s while ungrasped" alone would fire on an untouched box in half the episodes,
+    # because the spawn drift itself is 2-4.5 cm/s; a free body in mu-g only changes speed
+    # when something hits it, so require BOTH fast and disturbed.
+    _edge(st, "knock", not st["grasped"] and
+          np.linalg.norm(d.qvel[v:v + 3]) > max(0.03, st["v0"] + 0.005), t)
     inside = st["grasped"] and np.linalg.norm(d.qpos[a:a + 3] - TARGET_POS) < TARGET_R
     if not inside:
         st["in_region_since"] = None

@@ -98,7 +98,7 @@ def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.
             # freeze the counters at the end of the episode: the linger after `done_at` is
             # the ground having stopped sending, which would otherwise log a hold every run
             ev = dict(strategy.ev, keepout=st["keepout"], cage=st["cage_hits"],
-                      jams=st["jams"])
+                      jams=st["jams"], knockaway=st["knockaway"])
         if done_at is not None and now - done_at > linger_s:
             break
         if stop is not None and stop():

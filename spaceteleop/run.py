@@ -57,18 +57,23 @@ def episode(m, d, profile, seed, args, strategy_cls=None):
     link = Link(get(profile), sat.getsockname(), gnd.getsockname(), seed=seed).start()
     out = {}
     th = threading.Thread(target=lambda: out.update(sat_episode(
-        m, d, sat, ("127.0.0.1", link.down_port), seed, strategy_cls(), task=task,
+        m, d, sat, ("127.0.0.1", link.down_port), seed,
+        strategy_cls(cmd_hz=args.cmd_hz), task=task,
         max_s=args.max_s, tel_hz=args.tel_hz, frame_bytes=args.frame_bytes)), daemon=True)
     th.start()
     op = SyntheticOperator(m, seed=seed, task=task, tau_h=args.tau_h)
-    rows, gstats = ground_episode(gnd, ("127.0.0.1", link.up_port), op, strategy_cls(),
+    # the ground copy gets the operator itself: H14 scales the operator's speed, not the wire
+    gs = strategy_cls(operator=op, cmd_hz=args.cmd_hz, tel_hz=args.tel_hz, tau_h=op.tau_h)
+    rows, gstats = ground_episode(gnd, ("127.0.0.1", link.up_port), op, gs,
                                   cmd_hz=args.cmd_hz, tau_h=op.tau_h, max_s=args.max_s)
     th.join(5.0)
     stats = link.stats()
     link.stop()
     gnd.close()
     sat.close()
-    return rows, dict(gstats, **out, link=stats)
+    innov = getattr(gs, "innov", None)
+    return rows, dict(gstats, **out, link=stats,
+                      **({"twin_innov_m": sum(innov) / len(innov)} if innov else {}))
 
 
 def run_arm(m, args, arm, sink):
@@ -91,7 +96,8 @@ def run_arm(m, args, arm, sink):
         bw.append(s["link"])
         print(f"arm {arm} ep {k} seed {seed} success={em['success']} "
               f"{em['duration_s']:.1f}s rtt_p50={em['rtt_p50']:.0f}ms "
-              f"hold={em['hold_s']:.2f}s unsafe={em['unsafe']} frames={em['frames']}")
+              f"hold={em['hold_s']:.2f}s unsafe={em['unsafe']} frames={em['frames']}"
+              + (f" innov={s['twin_innov_m'] * 1000:.1f}mm" if "twin_innov_m" in s else ""))
     sink[arm] = (eps, bw)
 
 

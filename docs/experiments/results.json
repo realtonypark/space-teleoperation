@@ -1,0 +1,187 @@
+{
+ "cells": [
+  {
+   "block": "A",
+   "task": "capture",
+   "strategy": "baseline",
+   "profile": "sweep:500",
+   "tau_h": 0.17,
+   "seeds": 2,
+   "max_s": 30.0,
+   "extra_args": [],
+   "name": "A_capture_baseline_sweep500_tau0.17",
+   "seed0": 0,
+   "rtt_ms": 500.0,
+   "wall_s": 62.8,
+   "error": null,
+   "aggregate": {
+    "profile": "sweep:500",
+    "episodes": 2.0,
+    "success_rate": 0.0,
+    "mean_duration_s": NaN,
+    "demos_per_hour": 0.0,
+    "rtt_p50_ms": 499.9,
+    "rtt_p95_ms": 525.3,
+    "rtt_max_ms": 577.7,
+    "cmd_loss": 0.1,
+    "safety_hold_s": 0.0,
+    "jerk_sum_sq": 214000000000.0,
+    "sal": -22.87,
+    "ldlj": -22.48,
+    "stall_frac": 0.71,
+    "unsafe": 3,
+    "events": {
+     "move_in_hold": 0.0,
+     "vel_over": 0.0,
+     "keepout": 0.0,
+     "cage": 3.0,
+     "hold": 0.0,
+     "jams": 0.0,
+     "pos_clamp": 567.0,
+     "ramp_clip": 2469.0,
+     "retract": 0.0,
+     "stale": 265.0
+    },
+    "task": "capture",
+    "wire_up_Bps": 2165.0,
+    "wire_down_Bps": 3692.0,
+    "nominal_rtt_ms": 500.0
+   },
+   "episodes": [
+    {
+     "arm": 0,
+     "ep": 0,
+     "seed": 0,
+     "success": false,
+     "duration_s": 31.1,
+     "rtt_p50": 503.0,
+     "hold_s": 0.0,
+     "unsafe": 2,
+     "frames": 1490
+    },
+    {
+     "arm": 0,
+     "ep": 1,
+     "seed": 1,
+     "success": false,
+     "duration_s": 31.1,
+     "rtt_p50": 497.0,
+     "hold_s": 0.0,
+     "unsafe": 1,
+     "frames": 1495
+    }
+   ],
+   "seeds_used": [
+    0,
+    1
+   ],
+   "success": [
+    0,
+    0
+   ],
+   "durations": [
+    31.1,
+    31.1
+   ],
+   "n": 2,
+   "k": 0,
+   "wilson": [
+    0.0,
+    0.6576197724933469
+   ]
+  },
+  {
+   "block": "A",
+   "task": "capture",
+   "strategy": "baseline",
+   "profile": "zero",
+   "tau_h": 0.17,
+   "seeds": 2,
+   "max_s": 20.0,
+   "extra_args": [],
+   "name": "A_capture_baseline_zero_tau0.17",
+   "seed0": 0,
+   "rtt_ms": 0,
+   "wall_s": 17.8,
+   "error": null,
+   "aggregate": {
+    "profile": "zero",
+    "episodes": 2.0,
+    "success_rate": 1.0,
+    "mean_duration_s": 8.59,
+    "demos_per_hour": 419.1,
+    "rtt_p50_ms": 9.2,
+    "rtt_p95_ms": 21.2,
+    "rtt_max_ms": 25.0,
+    "cmd_loss": 0.0,
+    "safety_hold_s": 0.0,
+    "jerk_sum_sq": 140000000000.0,
+    "sal": -4.36,
+    "ldlj": -18.88,
+    "stall_frac": 0.4,
+    "unsafe": 1,
+    "events": {
+     "move_in_hold": 0.0,
+     "vel_over": 0.0,
+     "keepout": 0.0,
+     "cage": 1.0,
+     "hold": 0.0,
+     "jams": 0.0,
+     "pos_clamp": 1065.0,
+     "ramp_clip": 1927.0,
+     "retract": 0.0,
+     "stale": 0.0
+    },
+    "task": "capture",
+    "wire_up_Bps": 1941.0,
+    "wire_down_Bps": 3696.0,
+    "nominal_rtt_ms": 0.0
+   },
+   "episodes": [
+    {
+     "arm": 0,
+     "ep": 0,
+     "seed": 0,
+     "success": true,
+     "duration_s": 9.2,
+     "rtt_p50": 10.0,
+     "hold_s": 0.0,
+     "unsafe": 1,
+     "frames": 400
+    },
+    {
+     "arm": 0,
+     "ep": 1,
+     "seed": 1,
+     "success": true,
+     "duration_s": 8.0,
+     "rtt_p50": 9.0,
+     "hold_s": 0.0,
+     "unsafe": 0,
+     "frames": 340
+    }
+   ],
+   "seeds_used": [
+    0,
+    1
+   ],
+   "success": [
+    1,
+    1
+   ],
+   "durations": [
+    9.2,
+    8.0
+   ],
+   "n": 2,
+   "k": 2,
+   "wilson": [
+    0.34238022750665303,
+    1.0
+   ]
+  }
+ ],
+ "paired": [],
+ "knee": [],
+ "acceptance": []
+}

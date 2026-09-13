@@ -55,6 +55,7 @@ def run_episode(sock, up_addr, operator, strategy, cmd_hz=50.0, tau_h=0.17, max_
         if seen is None:                                  # nothing has arrived yet
             time.sleep(0.002)
             continue
+        seen = strategy.observe(seen, now)     # identity unless the strategy shows a twin
         sp = strategy.ground_step(seen, operator.step(seen, dt))
         ts = time.monotonic_ns()
         sock.sendto(pack_cmd(seq, ts, sp), up_addr)

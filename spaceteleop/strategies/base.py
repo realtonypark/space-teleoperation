@@ -31,6 +31,11 @@ class Strategy:
         self.t_prev = None
         self.ev = dict(hold=0, retract=0, move_in_hold=0, ramp_clip=0, pos_clamp=0)
 
+    def observe(self, tel, now):
+        """What the OPERATOR looks at, given the (already delayed) telemetry frame the
+        ground loop picked for it. Identity here; H10 substitutes a ground twin."""
+        return tel
+
     def ground_step(self, tel, target):
         return target
 

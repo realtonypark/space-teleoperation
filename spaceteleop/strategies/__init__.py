@@ -1,7 +1,11 @@
 """Strategy registry: name -> class, used by run.py --strategy and experiments/."""
+from .adaptive_gain import Gain
 from .baseline import Baseline
+from .deadreckon import DeadReckon, DeadReckon30
+from .twin import Twin
 
-STRATEGIES = {"baseline": Baseline}
+STRATEGIES = {"baseline": Baseline, "twin": Twin, "deadreckon": DeadReckon,
+              "deadreckon30": DeadReckon30, "gain": Gain}
 
 
 def get(name):
