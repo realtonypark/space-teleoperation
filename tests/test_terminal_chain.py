@@ -165,3 +165,78 @@ def test_tether_is_slack_inside_the_working_volume():
     # 6-DoF body" subset is empty
     for p in (sim.TARGET_POS, sim.TARGET_B, sim.SPAWN):
         assert np.linalg.norm(p - sim.TETHER) < sim.SLACK, p
+
+
+def _stall_the_jaw_on_the_box(m, d, ids, quat_seed=21):
+    """Close the jaw from OPEN onto a box parked at the grasp site, raw physics only.
+
+    The box blocks the pads, so the jaw stops wherever the box's projected width puts it,
+    which for this orientation is ABOVE JAW_GRASP. Returns the stall angle."""
+    mujoco.mj_resetDataKeyframe(m, d, 0)
+    d.qpos[sim.JAW] = d.ctrl[sim.JAW] = sim.JAW_OPEN
+    mujoco.mj_forward(m, d)
+    a, v = ids["qadr"], ids["vadr"]
+    q = np.random.default_rng(quat_seed).normal(size=4)
+    d.qpos[a:a + 3] = d.site_xpos[ids["site"]]
+    d.qpos[a + 3:a + 7] = q / np.linalg.norm(q)
+    d.qvel[v:v + 6] = 0
+    mujoco.mj_forward(m, d)
+    hold, jaw = np.array(d.qpos[:sim.NJ]), sim.JAW_OPEN
+    for _ in range(1200):                          # ramp shut at vmax, like the strategy
+        jaw = max(sim.JAW_CLOSED, jaw - sim.VMAX * m.opt.timestep)
+        d.ctrl[:sim.NJ] = hold
+        d.ctrl[sim.JAW] = jaw
+        mujoco.mj_step(m, d)
+    return float(d.qpos[sim.JAW])
+
+
+def _chain_run(seed, reset_mode, episodes, max_s=20.0, tau_h=0.17, hz=50):
+    """`episodes` chained demonstrations, same operator and same scene, as run.run_arm
+    chains them. -> [(success, reset_s, duration_s, phase)] per episode."""
+    m, d = sim.build("capture_chain")
+    st = sim.reset(m, d, seed, "capture_chain", reset_mode)
+    op = SyntheticOperator(m, seed=seed, task="capture_chain", tau_h=tau_h,
+                           reset_mode=reset_mode)
+    n, sub = max(1, round(tau_h * hz)), round(1.0 / hz / m.opt.timestep)
+    look = lambda: dict(q=list(d.qpos[:sim.NJ]) + [0.0], obj=list(sim.obj_pose(d, st)),
+                        flags=(0x02 if st["grasped"] else 0))
+    out = []
+    for k in range(episodes):
+        if k:                                      # sat.controller's chained carry-over
+            st.update(success=False, done=False, t_success=None, in_region_since=None)
+        t0, hist = d.time, [look()]
+        while d.time - t0 < max_s and not st["done"]:
+            sp = op.step(hist[max(0, len(hist) - n)], 1.0 / hz)
+            for _ in range(sub):
+                sim.step(m, d, sp, st, d.time)
+            hist.append(look())
+        out.append((st["success"] and st["done"],
+                    (d.time - st["t_success"]) if st["t_success"] else 0.0,
+                    d.time - t0, op.phase))
+        op.restart(st["done"])
+    return out
+
+
+def test_chained_teleop_run_survives_a_jaw_that_stalls_on_the_box():
+    """The H20 regression: a box PINCHED between the pads stops the jaw wherever its own
+    width does, which can be above JAW_GRASP. The angle-only capture predicate then never
+    fired on a grasp that had physically happened, the operator sat in `closing` for the
+    rest of the episode, and because `capture_chain` never resets the scene every later
+    demonstration inherited the same jammed jaw (30-seed teleop run at `zero`: 3/30, the
+    losers all at `closing` with the jaw stalled at 0.068-0.083 rad)."""
+    m, d = sim.build("capture_chain")
+    ids = sim.ids(m)
+    stall = _stall_the_jaw_on_the_box(m, d, ids)
+    assert stall > sim.JAW_GRASP, stall            # the angle alone can never see this one
+    st = dict(sim.reset(m, d, 0, "capture_chain"), grasped=False)
+    _stall_the_jaw_on_the_box(m, d, st["ids"])     # reset() moved the box; re-stall it
+    gp = d.site_xpos[st["ids"]["site"]]
+    assert np.linalg.norm(d.qpos[st["ids"]["qadr"]:st["ids"]["qadr"] + 3] - gp) < sim.GRASP_TOL
+    sim._capture(m, d, st, gp, 0.0)
+    assert st["grasped"], f"jaw stalled ON the box at {stall:.3f} rad and was not a capture"
+
+    eps = _chain_run(0, "teleop", 4)
+    assert sum(ok for ok, *_ in eps) >= 3, eps
+    for k, (ok, reset_s, _, _) in enumerate(eps):
+        if k:                                      # H20: the chained reset is teleoperated
+            assert reset_s > 0.0, (k, eps)

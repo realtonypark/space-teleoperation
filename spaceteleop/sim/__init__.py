@@ -55,6 +55,12 @@ GRASP_TOL = 0.025           # m, box centre to grasp site (jaw-scale capture env
 # angle at which the pad gap equals the box's diagonal (2*BOX*sqrt(2) = 22.6 mm), i.e. the
 # box can no longer pass back out between the pads. tests/test_sim_operator.py re-derives it
 # from the MJCF; the commanded JAW_CLOSED settles at a 17.8 mm gap, well inside it.
+# The angle is necessary but NOT sufficient: a box pinched between the pads STOPS the jaw
+# wherever its own projected width does, which for a tumbling 16 mm cube runs up to its
+# space diagonal (27.7 mm) and so can stall the jaw ABOVE JAW_GRASP (measured: 0.077 rad
+# with both pads bearing on the box). That is a real grasp the angle alone can never see,
+# and in `capture_chain` it deadlocked the whole run, so a pinch counts too -- see
+# `_capture`. Neither branch is satisfiable by the close COMMAND, which is T01's point.
 JAW_GRASP = 0.062           # rad
 TARGET_POS = np.array([0.16, -0.16, 0.22])
 TARGET_R = 0.05
@@ -188,6 +194,8 @@ def ids(m):
                 objg=g(mujoco.mjtObj.mjOBJ_GEOM, "obj"),
                 cage={i for i, n in enumerate(names) if n.startswith("cagewall")},
                 fix={i for i, n in enumerate(names) if n.startswith("holewall")},
+                padm={i for i, n in enumerate(names) if n.startswith("moving_jaw_pad")},
+                padf={i for i, n in enumerate(names) if n.startswith("fixed_jaw_pad")},
                 qadr=m.jnt_qposadr[g(mujoco.mjtObj.mjOBJ_JOINT, "obj_free")],
                 vadr=m.jnt_dofadr[g(mujoco.mjtObj.mjOBJ_JOINT, "obj_free")])
 
@@ -285,9 +293,17 @@ def step(m, d, ctrl, st, t):
 
 
 def _capture(m, d, st, gp, t):
-    a, v = st["ids"]["qadr"], st["ids"]["vadr"]
+    i, a, v = st["ids"], st["ids"]["qadr"], st["ids"]["vadr"]
     closing = d.ctrl[JAW] < 0.5 * JAW_OPEN
-    shut = closing and d.qpos[JAW] < JAW_GRASP          # the jaw itself, not the command
+    # the jaw itself, not the command: it either travelled to JAW_GRASP or it stopped early
+    # because the box is pinched between the two pads. Both need the ~0.6 s of real travel
+    # (the pads are 64 mm apart the moment `closing` turns true, so no 16-28 mm box can be
+    # touching both of them yet); only the angle alone was unsatisfiable on a grasp that
+    # physically happened, which left the operator stuck in `closing` for the rest of the
+    # run -- terminal in `capture_chain`, where nothing resets the scene.
+    shut = closing and (d.qpos[JAW] < JAW_GRASP or
+                        (_touching(d, i["padm"], other=i["objg"]) and
+                         _touching(d, i["padf"], other=i["objg"])))
     if st["grasped"]:
         if not closing:
             st["grasped"] = False
