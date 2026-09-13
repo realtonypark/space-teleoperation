@@ -5,6 +5,13 @@ Grasp it inside a jaw-scale envelope and hold it in the target region. The opera
 ever sees where the box WAS, so the steady-state chase error is (box speed x loop delay);
 at GRASP_TOL = 20 mm that error decides the episode, which is the whole point.
 
+`capture_chain` (H20): `capture` plus a dead-band tether on the box and two targets. The
+demonstration ends with a re-release that seeds the next one (targets alternate A->B->A),
+so there is no canonical reset to pay for; with `--reset teleop` the operator instead
+carries the box back to the spawn zone and releases it there, and that wall time is
+charged to the run. The tether's SPRING is slack (dead band) everywhere inside the working
+volume; its damping is not, see `_tendon`.
+
 `peg` (task 5): a 60 mm peg hanging from the jaw by its top with an unknown lateral grasp
 offset, inserted into a hole in a fixture bolted to the cage floor, CLEAR = 6 mm per side.
 Touching the fixture while the tip is below the fixture top jams the peg: it is left behind
@@ -42,6 +49,13 @@ HOLD_S = 0.2                # must stay in the target region this long
 BOX = 0.008                 # half-size
 DRIFT = (0.020, 0.045)      # m/s, SYNTHESIS section 3 task 2 (2-5 cm/s)
 TUMBLE = (0.3, 1.0)         # rad/s, task 2 (<= 1 rad/s)
+
+# --- capture_chain (H20) ---
+TARGET_B = np.array([-0.16, -0.30, 0.10])   # the other end of the A<->B alternation
+SPAWN = np.array([0.0, -0.31, 0.14])        # canonical spawn zone centre = teleop reset goal
+TETHER = np.array([0.0, -0.24, 0.16])       # anchor: A, B and SPAWN are all < SLACK from it
+SLACK = 0.20                                # m of dead band: zero force inside the volume
+PUSH = (0.020, 0.040)                       # m/s release push, SYNTHESIS 3 task 2 (2-5 cm/s)
 
 # --- peg ---
 PEG_H = 0.030               # half-length: a 60 mm peg
@@ -87,6 +101,43 @@ def _fixture():
     return "\n".join(out)
 
 
+def _tether():
+    return (f'<site name="anchor" pos="{TETHER[0]} {TETHER[1]} {TETHER[2]}" size="0.004" '
+            f'rgba="0.2 0.2 0.2 0.6"/>\n'
+            f'<site name="targetB" pos="{TARGET_B[0]} {TARGET_B[1]} {TARGET_B[2]}" '
+            f'size="{TARGET_R}" rgba="0.9 0.6 0.2 0.15"/>')
+
+
+def _tendon():
+    """Dead-band spatial tendon, H20's numbers verbatim (stiffness 0.005, damping 0.01).
+
+    `springlength="0 SLACK"` is a dead band on the SPRING only: zero elastic force until the
+    thread is straight. MuJoCo tendon damping has no dead band, so the thread also applies
+    -0.01 * (radial speed) while slack. Measured: a box released at 4.1 cm/s is down to
+    2.5 cm/s after 6 s (tau = m/c = 5 s), i.e. the "free 6-DoF body" subset (phenomenon D,
+    unique_data_study 2 D) is NOT force-free even when `taut_frac` reads 0.
+    # ponytail: kept at the specified 0.01 and reported, not silently retuned. `damping="0"`
+    # makes the slack thread exactly force-free at the cost of a bouncier return.
+    Second measured caveat: at stiffness 0.005 N/m a 3 cm/s box carries 2.3e-5 J, which the
+    spring only absorbs after ~9.5 cm of stretch, so this thread bounds an escape softly
+    rather than "returning it at its exit speed"."""
+    return (f'\n<tendon><spatial name="tether" limited="false" stiffness="0.005" '
+            f'damping="0.01" springlength="0 {SLACK}" width="0.0008" rgba="0.3 0.3 0.3 0.5">'
+            f'<site site="anchor"/><site site="objsite"/></spatial></tendon>')
+
+
+def dls(m, d, site, q, dx, lam=0.05):
+    """One damped-least-squares step: the joint delta that moves `site` by `dx` at `q`.
+    `d` is scratch MjData and is left forwarded at `q`. Damping bounds the step at wrist
+    singularities."""
+    d.qpos[:NJ] = q
+    mujoco.mj_forward(m, d)
+    jac = np.zeros((3, m.nv))
+    mujoco.mj_jacSite(m, d, jac, None, site)
+    j = jac[:, :NJ]
+    return j.T @ np.linalg.solve(j @ j.T + lam ** 2 * np.eye(3), dx)
+
+
 def _xml(task):
     src = open(_d.MJCF_PATH).read()
     site = ('<site name="grasp" pos="0 -0.085 0" size="0.004" rgba="0 1 0 0.4"/>\n'
@@ -97,12 +148,14 @@ def _xml(task):
       <freejoint name="obj_free"/>
       <geom name="obj" type="box" size="{sz}" mass="0.05" rgba="0.9 0.4 0.1 1"
             solimp="0.9 0.95 0.005" solref="0.02 1"/>
+      <site name="objsite" size="0.002" rgba="0 0 0 0"/>
     </body>
     {_cage()}
     {_fixture() if task == "peg" else ""}
     <site name="target" pos="{TARGET_POS[0]} {TARGET_POS[1]} {TARGET_POS[2]}"
           size="{TARGET_R}" rgba="0.2 0.6 1 0.15"/>
-    </worldbody>'''
+    {_tether() if task == "capture_chain" else ""}
+    </worldbody>{_tendon() if task == "capture_chain" else ""}'''
     return (src.replace('meshdir="assets/"', f'meshdir="{_d.PACKAGE_PATH}/assets/"')
                .replace('<option ', '<option gravity="0 0 0" ')
                .replace('<body name="Moving_Jaw"', site, 1)
@@ -126,8 +179,13 @@ def ids(m):
                 vadr=m.jnt_dofadr[g(mujoco.mjtObj.mjOBJ_JOINT, "obj_free")])
 
 
-def reset(m, d, seed, task="capture"):
-    """Fixed-seed reset -> state dict carrying the task and its safety-event counters."""
+def reset(m, d, seed, task="capture", reset_mode="free"):
+    """Fixed-seed reset -> state dict carrying the task and its safety-event counters.
+
+    `capture_chain` never calls this between chained demonstrations: the state dict (and
+    with it the box, the arm and the alternating target) is carried over, which is the
+    whole hypothesis. `reset_mode` only decides whether a release swaps the target
+    (`free`, chained) or leaves it at A (`teleop`, canonical)."""
     rng = np.random.default_rng(seed)
     mujoco.mj_resetDataKeyframe(m, d, 0)          # "home"
     i = ids(m)
@@ -135,7 +193,8 @@ def reset(m, d, seed, task="capture"):
     d.qpos[a + 3:a + 7] = [1, 0, 0, 0]
     st = dict(ids=i, task=task, grasped=False, off=np.zeros(3), in_region_since=None,
               success=False, jammed=False, jams=0, keepout=0, cage_hits=0,
-              t_out=None, t_hit=None)
+              t_out=None, t_hit=None, target=TARGET_POS.copy(), rng=rng,
+              reset=reset_mode, done=False, t_success=None)
     if task == "peg":
         st["pin"], st["left"] = None, False
         mujoco.mj_forward(m, d)
@@ -202,7 +261,9 @@ def step(m, d, ctrl, st, t):
     # the free object bouncing off a wall is not an unsafe MOTION event; the arm is
     _edge(st, "hit", _touching(d, i["cage"], but=i["objg"]), t)
     (_peg if st["task"] == "peg" else _capture)(m, d, st, gp, t)
-    return st["success"]
+    # chained: the demonstration is over at the RE-release, not at the grasp, because the
+    # release is what seeds the next one and it is teleoperated like everything else
+    return st["done"] if st["task"] == "capture_chain" else st["success"]
 
 
 def _capture(m, d, st, gp, t):
@@ -211,6 +272,8 @@ def _capture(m, d, st, gp, t):
     if st["grasped"]:
         if not closing:
             st["grasped"] = False
+            if st["task"] == "capture_chain":
+                _release(m, d, st)
         else:                                      # carry: box rides the grasp site
             st["off"] = st["off"] * 0.98
             d.qpos[a:a + 3] = gp + st["off"]
@@ -218,13 +281,36 @@ def _capture(m, d, st, gp, t):
             mujoco.mj_forward(m, d)
     elif closing and np.linalg.norm(d.qpos[a:a + 3] - gp) < GRASP_TOL:
         st["grasped"], st["off"] = True, d.qpos[a:a + 3] - gp   # reel the offset in
-    inside = st["grasped"] and np.linalg.norm(d.qpos[a:a + 3] - TARGET_POS) < TARGET_R
+    inside = st["grasped"] and np.linalg.norm(d.qpos[a:a + 3] - st["target"]) < TARGET_R
     if not inside:
         st["in_region_since"] = None
     elif st["in_region_since"] is None:
         st["in_region_since"] = t
     elif t - st["in_region_since"] >= HOLD_S:
         st["success"] = True
+        if st["t_success"] is None:
+            st["t_success"] = t
+
+
+def _release(m, d, st):
+    """H20: the terminal act of one demonstration is the initial condition of the next.
+
+    The box leaves with the velocity the arm had, plus a seeded 2-4 cm/s push and a small
+    spin, and the target swaps. Nothing teleports: the box keeps the pose it is in."""
+    i, v = st["ids"], st["ids"]["vadr"]
+    vel = np.zeros(6)
+    mujoco.mj_objectVelocity(m, d, mujoco.mjtObj.mjOBJ_SITE, i["site"], vel, 0)
+    d.qvel[v:v + 3] = vel[3:]
+    if not st["success"]:               # dropped it, not released it: no push, no credit
+        return mujoco.mj_forward(m, d)
+    u, w = st["rng"].normal(size=3), st["rng"].normal(size=3)
+    d.qvel[v:v + 3] += u / np.linalg.norm(u) * st["rng"].uniform(*PUSH)
+    d.qvel[v + 3:v + 6] = w / np.linalg.norm(w) * st["rng"].uniform(*TUMBLE)
+    if st["reset"] == "free":           # chained: alternate A <-> B, no canonical state
+        st["target"] = (TARGET_B if np.allclose(st["target"], TARGET_POS)
+                        else TARGET_POS.copy())
+    st["done"] = True
+    mujoco.mj_forward(m, d)
 
 
 def _peg(m, d, st, gp, t):

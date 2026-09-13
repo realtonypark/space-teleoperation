@@ -2,6 +2,10 @@
 
 demos_per_hour follows the spec: 3600 / mean wall time of the SUCCESSFUL episodes. It
 therefore ignores the wall time burned by failures; read it together with success_rate.
+demos_per_hour_gross (data_pipeline 3.2, the metric H20 moves) is 3600 * successes over
+the wall time of EVERY episode, failures and the teleoperated reset included, because a
+data campaign pays for those too. On `capture_chain` the reset is inside the episode: the
+demonstration ends at the re-release, not at the grasp.
 
 Smoothness is reported, never gated (section 6): robomimic showed operators who both hit
 high success rates produced very different policies, and SAL/LDLJ are the two measures
@@ -80,6 +84,8 @@ def episode_metrics(ep, success, duration_s, cmds_sent, cmds_rx, events=None, sa
     speed = np.linalg.norm(np.diff(obs, axis=0), axis=1) / period if len(obs) > 1 else np.zeros(1)
     ev = dict(events or {})
     ev["vel_over"] = _vel_over(sat, vmax)
+    if sat is not None and len(sat.get("taut", ())):      # H20: the "free 6-DoF" subset
+        ev["taut_frac"] = round(float(np.mean(sat["taut"])), 3)
     return dict(success=bool(success), duration_s=float(duration_s),
                 rtt_p50=percentile(rtt, 50), rtt_p95=percentile(rtt, 95),
                 rtt_max=float(rtt.max()) if len(rtt) else float("nan"),
@@ -101,21 +107,33 @@ def _vel_over(sat, vmax):
     return int(np.sum(dq[ok] / dt[ok] > vmax * 1.05))    # 5 % for float and clock noise
 
 
+def _agg_ev(eps, k):
+    """A fraction averages, a peak maxes, everything else is a count and sums."""
+    v = [e.get("events", {}).get(k, 0) for e in eps]
+    if k.endswith("_frac"):
+        return round(float(np.mean(v)), 3)
+    if k.endswith("_peak"):
+        return round(float(np.max(v)), 3)
+    return sum(int(x) for x in v)
+
+
 def aggregate(eps):
     """eps: list of episode_metrics dicts. -> summary incl. demos/hour."""
     ok = [e for e in eps if e["success"]]
     mean = lambda k, src: float(np.mean([e[k] for e in src])) if src else float("nan")
     keys = set().union(*[e.get("events", {}) for e in eps]) if eps else set()
+    wall = sum(e["duration_s"] for e in eps)
     return dict(episodes=len(eps), success_rate=len(ok) / max(1, len(eps)),
                 mean_duration_s=mean("duration_s", ok),
                 demos_per_hour=3600.0 / mean("duration_s", ok) if ok else 0.0,
+                demos_per_hour_gross=3600.0 * len(ok) / wall if wall else 0.0,
                 rtt_p50=mean("rtt_p50", eps), rtt_p95=mean("rtt_p95", eps),
                 rtt_max=max([e["rtt_max"] for e in eps], default=float("nan")),
                 cmd_loss=mean("cmd_loss", eps), hold_s=mean("hold_s", eps),
                 jerk=mean("jerk", eps), sal=mean("sal", eps), ldlj=mean("ldlj", eps),
                 stall_frac=mean("stall_frac", eps),
                 unsafe=sum(e["unsafe"] for e in eps),
-                events={k: sum(int(e.get("events", {}).get(k, 0)) for e in eps) for k in sorted(keys)})
+                events={k: _agg_ev(eps, k) for k in sorted(keys)})
 
 
 def table(name, agg, extra=()):
@@ -123,6 +141,7 @@ def table(name, agg, extra=()):
             ("success_rate", f"{agg['success_rate']:.2f}"),
             ("mean_duration_s", f"{agg['mean_duration_s']:.2f}"),
             ("demos_per_hour", f"{agg['demos_per_hour']:.1f}"),
+            ("demos_per_h_gross", f"{agg.get('demos_per_hour_gross', 0.0):.1f}"),
             ("rtt_p50_ms", f"{agg['rtt_p50']:.1f}"), ("rtt_p95_ms", f"{agg['rtt_p95']:.1f}"),
             ("rtt_max_ms", f"{agg['rtt_max']:.1f}"), ("cmd_loss", f"{agg['cmd_loss']:.3f}"),
             ("safety_hold_s", f"{agg['hold_s']:.2f}"), ("jerk_sum_sq", f"{agg['jerk']:.3g}"),

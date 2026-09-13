@@ -19,6 +19,7 @@ F_SAFETY_HOLD = 1 << 0
 F_GRASPED = 1 << 1
 F_SUCCESS = 1 << 2
 F_DONE = 1 << 3
+F_ASSIST = 1 << 4   # H11: an onboard primitive, not the operator, is driving this frame
 
 _CMD = struct.Struct("<4sIq7fB")
 _TEL = struct.Struct("<4sIqIqq21fBH")

@@ -32,13 +32,16 @@ from .link.emulator import Link
 from .link.profiles import PROFILES, get, rtt_ms
 from .metrics import aggregate, episode_metrics, table
 from .record import load_episode, load_sat, write_episode
-from .sat.controller import MAX_FRAME, run_episode as sat_episode
+from .sat.controller import MAX_FRAME, RESET_MAX, run_episode as sat_episode
 from .strategies import STRATEGIES, get as get_strategy
 from .strategies.baseline import Baseline
 
 TASKS = {
     "capture": "SYNTHESIS 3 task 2: grasp a box drifting at 2-5 cm/s, hold it in the target",
     "peg": "SYNTHESIS 3 task 5: insert a 60 mm peg into a fixture hole, 6 mm clearance",
+    "capture_chain": "H20: capture, then RE-RELEASE to seed the next demo (targets A<->B), "
+                     "tethered box; --reset free chains, --reset teleop charges a "
+                     "teleoperated return-to-spawn",
 }
 
 
@@ -49,35 +52,63 @@ def _sock():
     return s
 
 
-def episode(m, d, profile, seed, args, strategy_cls=None):
-    """One full episode over real sockets. Returns (rows, ep_summary)."""
+def episode(m, d, profile, seed, args, strategy_cls=None, op=None, st=None):
+    """One full episode over real sockets. Returns (rows, ep_summary).
+
+    `op` and `st` are the H20 chaining seam: pass the previous episode's operator and sim
+    state and the scene is not reset, so the next demonstration starts from where the last
+    one let go. Both default to None = the canonical per-episode behaviour."""
     task = getattr(args, "task", "capture")
+    mode = getattr(args, "reset", "free")
+    grace = RESET_MAX if task == "capture_chain" else 0.0   # the reset is teleoperated too
     strategy_cls = strategy_cls or get_strategy(getattr(args, "strategy", "baseline"))
     gnd, sat = _sock(), _sock()
     link = Link(get(profile), sat.getsockname(), gnd.getsockname(), seed=seed).start()
     out = {}
     th = threading.Thread(target=lambda: out.update(sat_episode(
         m, d, sat, ("127.0.0.1", link.down_port), seed, strategy_cls(), task=task,
-        max_s=args.max_s, tel_hz=args.tel_hz, frame_bytes=args.frame_bytes)), daemon=True)
+        max_s=args.max_s, tel_hz=args.tel_hz, frame_bytes=args.frame_bytes, st=st,
+        reset_mode=mode)), daemon=True)
     th.start()
-    op = SyntheticOperator(m, seed=seed, task=task, tau_h=args.tau_h)
-    rows, gstats = ground_episode(gnd, ("127.0.0.1", link.up_port), op, strategy_cls(),
-                                  cmd_hz=args.cmd_hz, tau_h=op.tau_h, max_s=args.max_s)
-    th.join(5.0)
+    op = op or SyntheticOperator(m, seed=seed, task=task, tau_h=args.tau_h, reset_mode=mode)
+    gstrat = strategy_cls(m=m)          # H11 ground ablation needs the model for its FK
+    t_launch = time.monotonic()
+    rows, gstats = ground_episode(gnd, ("127.0.0.1", link.up_port), op, gstrat,
+                                  cmd_hz=args.cmd_hz, tau_h=op.tau_h,
+                                  max_s=args.max_s + grace)
+    th.join(5.0 + grace)
     stats = link.stats()
     link.stop()
     gnd.close()
     sat.close()
-    return rows, dict(gstats, **out, link=stats)
+    ev = dict(out.get("events", {}))
+    for k, v in gstrat.ev.items():      # a ground-side strategy counts on its own side
+        if k.endswith(("_frac", "_peak")):
+            ev[k] = max(ev.get(k, 0), v)
+    out["events"] = ev
+    return rows, dict(gstats, **out, link=stats,
+                      t_first_cmd=t_launch + (rows[0]["timestamp"] if rows else 0.0))
 
 
 def run_arm(m, args, arm, sink):
     d = mujoco.MjData(m)
-    eps, n, bw = [], 0, []
+    eps, n, bw, resets = [], 0, [], []
+    chain = args.task == "capture_chain"
+    op, st, t_success = None, None, None
     for k in range(args.episodes):
         seed = args.seed + 1000 * arm + k
+        if op is None or not chain:
+            op = SyntheticOperator(m, seed=seed, task=args.task, tau_h=args.tau_h,
+                                   reset_mode=args.reset)
         t0 = time.monotonic()
-        rows, s = episode(m, d, args.profile, seed, args)
+        rows, s = episode(m, d, args.profile, seed, args, op=op, st=st)
+        if t_success is not None:
+            # R, per the H20 trap: success -> the next episode's FIRST command, over the
+            # real link, through the real operator. Never a sim.reset teleport.
+            resets.append(s["t_first_cmd"] - t_success)
+        if chain:
+            st, t_success = s["st"], s["success_wall"]
+            op.restart(s["released"])
         if len(rows) < 4:
             raise RuntimeError(f"arm {arm} episode {k} produced {len(rows)} commands: "
                                f"the satellite or the link never came up ({s})")
@@ -91,8 +122,9 @@ def run_arm(m, args, arm, sink):
         bw.append(s["link"])
         print(f"arm {arm} ep {k} seed {seed} success={em['success']} "
               f"{em['duration_s']:.1f}s rtt_p50={em['rtt_p50']:.0f}ms "
-              f"hold={em['hold_s']:.2f}s unsafe={em['unsafe']} frames={em['frames']}")
-    sink[arm] = (eps, bw)
+              f"hold={em['hold_s']:.2f}s unsafe={em['unsafe']} frames={em['frames']}"
+              + (f" reset={s['reset_s']:.1f}s" if chain else ""))
+    sink[arm] = (eps, bw, resets)
 
 
 def main(argv=None):
@@ -100,6 +132,9 @@ def main(argv=None):
     p.add_argument("--profile", default="zero",
                    help=f"{' | '.join(sorted(PROFILES))} | sweep:<rtt_ms>")
     p.add_argument("--task", default="capture", choices=sorted(TASKS))
+    p.add_argument("--reset", default="free", choices=("free", "teleop"),
+                   help="capture_chain: free = the release seeds the next demo (chained); "
+                        "teleop = carry the box back to the spawn zone first, charged")
     p.add_argument("--strategy", default="baseline", choices=sorted(STRATEGIES))
     p.add_argument("--list-tasks", action="store_true", help="print the task set and exit")
     p.add_argument("--arms", type=int, default=1, help="independent concurrent triplets")
@@ -131,6 +166,7 @@ def main(argv=None):
 
     eps = [e for a in range(args.arms) for e in sink[a][0]]
     bw = [b for a in range(args.arms) for b in sink[a][1]]
+    rs = [r for a in range(args.arms) for r in sink[a][2]]
     up = sum(b["up_bps"] for b in bw) / max(1, len(bw)) * args.arms
     down = sum(b["down_bps"] for b in bw) / max(1, len(bw)) * args.arms
     print()
@@ -142,8 +178,11 @@ def main(argv=None):
                   f"rtt_p50 {g['rtt_p50']:.0f} ms")
         print()
     agg = aggregate(eps)
+    agg["reset_R_s"] = sum(rs) / len(rs) if rs else float("nan")
     print(table(args.profile, agg, extra=[
-        ("task", args.task), ("arms", args.arms),
+        ("task", args.task), ("strategy", args.strategy), ("arms", args.arms),
+        ("reset_mode", args.reset),
+        ("R_s", f"{agg['reset_R_s']:.2f} (n={len(rs)})"),
         ("wire_up_Bps", f"{up:,.0f}"), ("wire_down_Bps", f"{down:,.0f}"),
         ("nominal_rtt_ms", f"{rtt_ms(args.profile):.0f}"), ("written", args.out)]))
     return agg
