@@ -38,11 +38,13 @@ ALL_PROFILES = ["zero", "direct_gs", "leo_relay", "geo_relay"] + [f"sweep:{r}" f
 TIER1 = {
     "A": dict(tasks=["capture"], arms="all", profiles=ALL_PROFILES, tau_h=PRIMARY_TAU),
     "B": dict(tasks=["peg"], arms="all", profiles=ALL_PROFILES, tau_h=PRIMARY_TAU),
-    "C": dict(tasks=["capture_chain", "capture"], arms="base", tau_h=PRIMARY_TAU,
+    # H20: C = chained release-is-reset; Cr = same task, canonical teleoperated reset
+    # charged to wall time. Both run under the baseline strategy (selection.md 3).
+    "C": dict(tasks=["capture_chain", "capture_chain_teleop"], arms="base", tau_h=PRIMARY_TAU,
               profiles=["zero", "direct_gs", "leo_relay", "sweep:250", "sweep:500",
                         "sweep:1000"],
-              # H20's Cr arm: same task, teleop reset charged to wall time.
-              extra={"capture": ["--charge-reset"]}),
+              extra={"capture_chain": ["--reset", "free"],
+                     "capture_chain_teleop": ["--reset", "teleop"]}),
     "E": dict(tasks=["capture", "peg"], arms="primary", tau_h=0.25,
               profiles=["leo_relay", "sweep:400", "geo_relay"]),
 }
@@ -175,7 +177,8 @@ def run_cell(cell, root, seed0=0):
     d = f"{root}/{cell.name}"
     os.makedirs(d, exist_ok=True)
     cmd = ["uv", "run", "python", "-m", "spaceteleop.run",
-           "--profile", cell.profile, "--task", cell.task, "--strategy", cell.strategy,
+           "--profile", cell.profile, "--task", cell.task.replace("_teleop", ""),
+           "--strategy", cell.strategy,
            "--episodes", str(cell.seeds), "--seed", str(seed0), "--out", d,
            "--max-s", str(cell.max_s), "--tau-h", str(cell.tau_h), *cell.extra_args]
     t0 = time.monotonic()
