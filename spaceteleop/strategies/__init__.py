@@ -2,10 +2,12 @@
 from .adaptive_gain import Gain
 from .baseline import Baseline
 from .deadreckon import DeadReckon, DeadReckon30
+from .terminal import Terminal, TerminalGround
 from .twin import Twin
 
 STRATEGIES = {"baseline": Baseline, "twin": Twin, "deadreckon": DeadReckon,
-              "deadreckon30": DeadReckon30, "gain": Gain}
+              "deadreckon30": DeadReckon30, "gain": Gain,
+              "terminal": Terminal, "terminal_ground": TerminalGround}
 
 
 def get(name):

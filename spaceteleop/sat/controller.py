@@ -24,9 +24,13 @@ import time
 import numpy as np
 
 from .. import sim
-from ..proto import (F_DONE, F_GRASPED, F_SAFETY_HOLD, F_SUCCESS, pack_tel, unpack_cmd)
+from ..proto import (F_ASSIST, F_DONE, F_GRASPED, F_SAFETY_HOLD, F_SUCCESS, pack_tel,
+                     unpack_cmd)
 
 BUFLEN = 64
+# H20: a chained episode does not end at success but at the teleoperated re-release that
+# seeds the next one, so the max_s guillotine has to allow for the reset segment.
+RESET_MAX = 8.0
 # One telemetry frame is one datagram, and macOS caps a UDP datagram at 9216 bytes
 # (net.inet.udp.maxdgram, root-only). 8 kB/frame at 30 Hz models a ~2 Mb/s video budget,
 # which is the range this program cares about.
@@ -35,20 +39,32 @@ MAX_FRAME = 8192
 
 
 def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.0,
-                tel_hz=30.0, frame_bytes=0, linger_s=1.0, stop=None):
-    """Run one episode. Returns a summary dict. Blocks until success, max_s or stop()."""
+                tel_hz=30.0, frame_bytes=0, linger_s=1.0, stop=None, st=None,
+                reset_mode="free"):
+    """Run one episode. Returns a summary dict. Blocks until success, max_s or stop().
+
+    `st` carries a previous episode's sim state in (H20 chaining): passing it in means the
+    scene is NOT reset, so the box, the arm and the alternating target continue where the
+    last demonstration left them. Nothing else about the episode changes."""
     if frame_bytes > MAX_FRAME:
         raise ValueError(f"frame_bytes > {MAX_FRAME}: one telemetry frame is one datagram")
-    st = sim.reset(m, d, seed, task)
+    if st is None:
+        st = sim.reset(m, d, seed, task, reset_mode)
+    else:                              # chained: new demonstration, same scene and box
+        st.update(success=False, done=False, t_success=None, in_region_since=None,
+                  keepout=0, cage_hits=0, jams=0, t_out=None, t_hit=None)
+    strategy.sat = (m, d, st)          # H11: the primitive needs the satellite's own state
     home = list(d.ctrl[:sim.NJ]) + [0.0]
     strategy.last, strategy.reset_pose = list(home), list(home)
     strategy.qlim = (list(m.jnt_range[:sim.NJ, 0]) + [-1e9],
                      list(m.jnt_range[:sim.NJ, 1]) + [1e9])
-    buf, t0 = [], time.monotonic()
+    # sim_t0: a chained episode does not reset the scene, so MuJoCo time carries over and
+    # "step up to wall clock" has to be measured from where this episode started.
+    buf, t0, sim_t0 = [], time.monotonic(), d.time
     last_arr, last_seq, last_tsend, ncmd, reordered = None, 0, 0, 0, 0
     tel_seq, next_tel, tel_dt = 0, 0.0, 1.0 / tel_hz
     frame = b"\0" * frame_bytes
-    hold_time, holds, done_at = 0.0, 0, None
+    hold_time, holds, done_at, success_at = 0.0, 0, None, None
     prev, t_applied, seen, satlog, ev = t0, 0, 0, [], None
     while True:
         while True:                                   # drain everything that arrived
@@ -78,21 +94,30 @@ def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.
         prev = now
         # the strategy ramp-limits against `now`; log the SAME instant or the
         # recorded velocity would be measured against a different clock reading
-        satlog.append((int(now * 1e9), t_applied, last_seq, held, sp))
-        while d.time < now - t0:                      # step the sim up to wall clock
+        assist = bool(getattr(strategy, "assist", False))
+        satlog.append((int(now * 1e9), t_applied, last_seq, held, sp, assist,
+                       bool(m.ntendon and d.ten_length[0] > sim.SLACK)))
+        while d.time - sim_t0 < now - t0:             # step the sim up to wall clock
             if sim.step(m, d, sp, st, d.time) and done_at is None:
                 done_at = now
+        if st["success"] and success_at is None:
+            success_at = now                          # H20: R is measured from here
         if now - t0 >= next_tel:
             next_tel += tel_dt
             tel_seq += 1
+            # chained: F_SUCCESS is only raised at the end, or the ground loop would stop
+            # driving before the operator has released. The operator sees the box parked
+            # in the target region and lets go on its own, like a human watching video.
+            won = st["success"] and (task != "capture_chain" or st["done"])
             flags = ((F_SAFETY_HOLD if held else 0) | (F_GRASPED if st["grasped"] else 0) |
-                     (F_SUCCESS if st["success"] else 0) | (F_DONE if done_at else 0))
+                     (F_SUCCESS if won else 0) | (F_DONE if done_at else 0) |
+                     (F_ASSIST if assist else 0))
             q = list(d.qpos[:sim.NJ]) + [0.0]
             qd = list(d.qvel[:sim.NJ]) + [0.0]
             sock.sendto(pack_tel(tel_seq, time.monotonic_ns(), last_seq, last_tsend,
                                  t_applied, q, qd, sim.obj_pose(d, st), flags, frame),
                         down_addr)
-        if done_at is None and now - t0 >= max_s:
+        if done_at is None and now - t0 >= max_s + (RESET_MAX if success_at else 0.0):
             done_at = now
         if done_at is not None and ev is None:
             # freeze the counters at the end of the episode: the linger after `done_at` is
@@ -104,8 +129,10 @@ def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.
         if stop is not None and stop():
             break
         time.sleep(0.001)
-    return dict(success=st["success"], duration=min(d.time, max_s), cmds_rx=ncmd,
+    return dict(success=st["success"], duration=min(d.time - sim_t0, max_s), cmds_rx=ncmd,
                 last_seq=last_seq, hold_time=hold_time, hold_steps=holds,
-                reordered=reordered, satlog=satlog,
+                reordered=reordered, satlog=satlog, st=st, success_wall=success_at,
+                released=st["done"],
+                reset_s=(done_at - success_at) if success_at and done_at else 0.0,
                 events=dict(ev or strategy.ev, stale=reordered),
                 obj=sim.obj_pose(d, st)[:3].tolist())

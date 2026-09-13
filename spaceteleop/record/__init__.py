@@ -34,16 +34,21 @@ COLS = ["observation.state", "action", "timestamp", "frame_index", "episode_inde
 
 
 def write_sat(out_dir, ep_index, satlog):
-    """satlog: [(t_ns, t_applied_ns, cmd_seq, hold, setpoint7)] -> npz path (or None)."""
+    """satlog: [(t_ns, t_applied_ns, cmd_seq, hold, setpoint7[, assist, taut])] -> npz path.
+
+    `assist` is proto.F_ASSIST per control cycle (H11): the mask a training run needs to
+    tell a robot-executed segment from a human-executed one. `taut` is H20's tether."""
     if not satlog:
         return None
+    col = lambda i, t: np.array([r[i] if len(r) > i else 0 for r in satlog], t)
     path = f"{out_dir}/data/episode_{ep_index:06d}_sat.npz"
     np.savez_compressed(
         path, t_ns=np.array([r[0] for r in satlog], np.int64),
         t_applied_ns=np.array([r[1] for r in satlog], np.int64),
         cmd_seq=np.array([r[2] for r in satlog], np.int64),
         hold=np.array([r[3] for r in satlog], bool),
-        setpoint=np.array([r[4] for r in satlog], np.float32))
+        setpoint=np.array([r[4] for r in satlog], np.float32),
+        assist=col(5, bool), taut=col(6, bool))
     return path
 
 
