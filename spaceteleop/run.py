@@ -115,8 +115,19 @@ def run_arm(m, args, arm, sink):
             st, t_success = s["st"], s["success_wall"]
             op.restart(s["released"])
         if len(rows) < 4:
-            raise RuntimeError(f"arm {arm} episode {k} produced {len(rows)} commands: "
-                               f"the satellite or the link never came up ({s})")
+            if not eps:
+                raise RuntimeError(f"arm {arm} episode {k} produced {len(rows)} commands: "
+                                   f"the satellite or the link never came up")
+            # A whole episode inside a blackout (e.g. a GEO handover phased onto link
+            # start) is a failed demonstration, not a harness fault: log it and go on.
+            em = dict(eps[-1], success=False, duration_s=float(args.max_s), frames=0,
+                      rtt_p50=float("nan"), rtt_p95=float("nan"), rtt_max=float("nan"),
+                      cmd_loss=1.0, hold_frames=0, hold_s=0.0, stalls=0, max_dt_s=0.0,
+                      cage=0, no_link=True, events={k2: 0 for k2 in eps[-1]["events"]})
+            eps.append(em)
+            bw.append(s["link"])
+            print(f"arm {arm} ep {k} seed {seed} success=False NO_LINK {args.max_s:.1f}s")
+            continue
         out = args.out if args.arms == 1 else f"{args.out}/arm{arm}"
         path = write_episode(out, k, rows, task=args.task, index0=n, satlog=s["satlog"])
         n += len(rows)
