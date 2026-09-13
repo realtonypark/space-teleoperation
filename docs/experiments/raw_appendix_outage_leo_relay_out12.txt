@@ -1,0 +1,60 @@
+arm 0 ep 0 seed 0 success=True 8.8s rtt_p50=42ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.00s frames=433
+arm 0 ep 1 seed 1 success=True 8.0s rtt_p50=44ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=396
+arm 0 ep 2 seed 2 success=True 7.9s rtt_p50=51ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=388
+arm 0 ep 3 seed 3 success=True 14.7s rtt_p50=46ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.00s frames=730
+arm 0 ep 4 seed 4 success=False 20.0s rtt_p50=40ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=996
+arm 0 ep 5 seed 5 success=False 20.0s rtt_p50=43ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.01s frames=993
+arm 0 ep 6 seed 6 success=True 6.0s rtt_p50=48ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=294
+arm 0 ep 7 seed 7 success=True 5.6s rtt_p50=40ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=276
+arm 0 ep 8 seed 8 success=True 7.4s rtt_p50=41ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=361
+arm 0 ep 9 seed 9 success=False 20.0s rtt_p50=41ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.00s frames=994
+arm 0 ep 10 seed 10 success=False 20.0s rtt_p50=47ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.01s frames=998
+arm 0 ep 11 seed 11 success=False 20.0s rtt_p50=56ms hold=9.45s unsafe=0 cage=1 stalls=0 max_dt=0.02s frames=994
+arm 0 ep 12 seed 12 success=True 5.7s rtt_p50=40ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=277
+arm 0 ep 13 seed 13 success=False 20.0s rtt_p50=43ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.00s frames=1000
+arm 0 ep 14 seed 14 success=True 8.2s rtt_p50=47ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=401
+arm 0 ep 15 seed 15 success=True 5.4s rtt_p50=51ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=262
+arm 0 ep 16 seed 16 success=False 20.0s rtt_p50=50ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=995
+arm 0 ep 17 seed 17 success=True 9.2s rtt_p50=42ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.00s frames=453
+arm 0 ep 18 seed 18 success=True 6.8s rtt_p50=43ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=333
+arm 0 ep 19 seed 19 success=True 7.9s rtt_p50=43ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=386
+arm 0 ep 20 seed 20 success=True 6.6s rtt_p50=43ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=322
+arm 0 ep 21 seed 21 success=False 20.0s rtt_p50=46ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.02s frames=994
+arm 0 ep 22 seed 22 success=True 8.9s rtt_p50=43ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.00s frames=438
+arm 0 ep 23 seed 23 success=True 5.9s rtt_p50=36ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=290
+arm 0 ep 24 seed 24 success=False 20.0s rtt_p50=40ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.00s frames=993
+arm 0 ep 25 seed 25 success=False 20.0s rtt_p50=42ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.01s frames=995
+arm 0 ep 26 seed 26 success=False 20.0s rtt_p50=45ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=994
+arm 0 ep 27 seed 27 success=True 5.7s rtt_p50=39ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=279
+arm 0 ep 28 seed 28 success=False 20.0s rtt_p50=46ms hold=0.00s unsafe=0 cage=1 stalls=0 max_dt=0.00s frames=995
+arm 0 ep 29 seed 29 success=True 9.2s rtt_p50=45ms hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.00s frames=455
+
+profile          leo_relay_out12
+episodes         30
+success_rate     0.60
+mean_duration_s  7.65
+demos_per_hour   470.4
+demos_per_h_gross 171.5
+rtt_p50_ms       44.1
+rtt_p95_ms       69.8
+rtt_max_ms       165.0
+cmd_loss         0.119
+safety_hold_s    0.31
+jerk_sum_sq      1.3e+11
+sal              -4.71
+ldlj             -19.36
+stall_frac       0.06
+unsafe_events    0  (move_in_hold=0, vel_over=0, keepout=0)
+cage             13
+stalls           0
+max_dt_s         0.023
+diagnostics      cage=13, hold=1, jams=0, knockaway=31, pos_clamp=15403, ramp_clip=25884, retract=0, stale=1729, taut_frac=0.0
+task             capture
+strategy         baseline
+arms             1
+reset_mode       free
+R_s              nan (n=0)
+wire_up_Bps      2,018
+wire_down_Bps    3,697
+nominal_rtt_ms   48
+written          docs/experiments/raw_appendix/outage_leo_relay_out12
