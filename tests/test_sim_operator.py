@@ -136,3 +136,33 @@ def test_keepout_and_cage_events_are_recorded():
     for k in range(3000):                                     # arm parked, box drifts
         sim.step(m, d, list(d.ctrl[:6]) + [0.0], st2, k * m.opt.timestep)
     assert st2["cage_hits"] == 0 and st2["keepout"] == 0, st2
+
+
+@pytest.mark.parametrize("old_depth,new_depth,new_contact,expected", [
+    (-0.001, 0.001, False, False),  # a previously inserted tip has withdrawn
+    (0.001, -0.001, False, True),   # the current tip has reached insertion depth
+    (-0.001, -0.001, True, False),  # the updated pose contacts the fixture
+])
+def test_peg_success_uses_updated_pose_and_contacts(
+        monkeypatch, old_depth, new_depth, new_contact, expected):
+    from types import SimpleNamespace
+
+    d = SimpleNamespace(qpos=np.zeros(13), qvel=np.zeros(12))
+    st = dict(ids=dict(qadr=6, vadr=6, fix={1}, objg=2), jammed=False,
+              off=np.zeros(3), success=False)
+    height = sim.FIX_TOP - sim.DEPTH + sim.PEG_H
+    d.qpos[6:9] = [*sim.HOLE[:2], height + old_depth]
+    gp = np.array([*sim.HOLE[:2], height + new_depth])
+    contacts = iter((False, new_contact))
+    checked_heights = []
+
+    def touching(data, *args):
+        checked_heights.append(data.qpos[8])
+        return next(contacts)
+
+    monkeypatch.setattr(sim, "_touching", touching)
+    monkeypatch.setattr(mujoco, "mj_forward", lambda m, d: None)
+    sim._peg(None, d, st, gp, 0.0)
+    assert bool(st["success"]) is expected
+    assert checked_heights == [height + old_depth, height + new_depth]
+    assert not st["jammed"], "terminal checking must not change the jam transition"

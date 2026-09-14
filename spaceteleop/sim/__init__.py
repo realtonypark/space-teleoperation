@@ -374,4 +374,6 @@ def _peg(m, d, st, gp, t):
     d.qvel[v:v + 6] = 0
     mujoco.mj_forward(m, d)
     inside = np.linalg.norm((d.qpos[a:a + 2] - HOLE[:2])) < BOX + CLEAR
+    tip = d.qpos[a + 2] - PEG_H
+    touch = _touching(d, i["fix"], i["objg"])
     st["success"] = st["success"] or (inside and not touch and tip <= FIX_TOP - DEPTH)

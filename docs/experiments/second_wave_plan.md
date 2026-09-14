@@ -78,3 +78,18 @@ accounting. It is not powered to confirm H20's throughput or success-retention c
 the 20 linked episodes as independent replicates or pool them with the primary protocol. Also test
 an intentionally unfinished release under a fake clock and retry the same output metadata in a
 small regression test. These deterministic checks provide the evidence for those failure paths.
+
+## Final Peg endpoint regression (added after endpoint review)
+
+A final metadata check found six successful primary Peg endpoints slightly above the depth
+threshold because completion used the pre-update tip height. Correct only the terminal predicate
+to use tip height and contact after the kinematic pose update; preserve jam/regrasp behavior.
+Record this third execution revision and retain the 450 primary outcomes under their original
+revision. Do not retroactively relabel a trajectory that would have continued under the new code.
+
+After the deterministic regression passes, run ten fresh scenarios (4000–4009) each for Peg
+baseline/zero, baseline/leo_relay and Terminal/sweep:400, three processes, 30 s deadline and
+170 ms reaction delay. These 30 episodes check the corrected terminal predicate, not a new paired
+mechanism estimate. Independently reconstruct final Peg pose/contact from saved state and check
+every successful endpoint against the complete terminal predicate. Keep these observations
+separate from the primary study and chain regression.
