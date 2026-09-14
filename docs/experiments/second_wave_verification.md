@@ -61,8 +61,10 @@ uv run python docs/experiments/second_wave/verify_records.py --self-check
 uv run python docs/experiments/second_wave/verify_chains.py --self-check
 ```
 
-The statistical script reproduces both historical reanalysis and the separate corrected-run
-section, with deterministic resampling and input hashes. Undefined ratios serialize as JSON
+A clean clone checked out `86b98d9`, ran the commands above, and reproduced `statistics.json`
+byte-for-byte (`git diff --exit-code` passed). Both audit self-checks passed there. The statistical
+script reproduces historical reanalysis and the separate corrected-run section with deterministic
+resampling and input hashes. Undefined ratios serialize as JSON
 `null`; censored knees use an explicit label. The original report present at task start is
 preserved byte-for-byte in [REPORT_WAVE1.md](../REPORT_WAVE1.md).
 
@@ -99,7 +101,8 @@ callers. The report preserves original gates, uncertainty, missing profiles and 
 
 The results page uses static data with no external chart dependency. Its earlier second-wave
 layout passed actual desktop (1280 px) and mobile (390 px) browser checks, with no overflow or
-console errors. Final data rows and local links were checked statically. Final browser rechecking
+console errors. Final data rows and local links were checked statically. Local links in ten current entry/review
+files resolved, every second-wave JSON file passed strict parsing, and `git diff --check` passed. Final browser rechecking
 was attempted but blocked by browser-connection timeouts; final visual/console verification is
 therefore incomplete. This is disclosed rather than treating the earlier check as final evidence.
 
