@@ -142,3 +142,127 @@ regressions after any executable edit, and verify the completed results and repr
 sections against generated artifacts. Changes after the frozen run need their own
 revision/provenance note; they must not be presented as the code that generated the
 450 frozen-run episodes.
+
+## Final numerical review and resolution addendum
+
+Reviewed the integrated primary results after all 450 episodes completed. The primary
+execution snapshot is `0f68e78`; the subsequent corrections are in `550e190`. Supplemental
+chain execution was still running during this addendum. The findings above are preserved
+as the original review record; the resolution table below gives their later status.
+No simulator or full recording audit was rerun by this reviewer during the chain run.
+
+| Finding | Resolution checked in source and regressions |
+|---|---|
+| R1, chain release | Fixed in `550e190`: returned success and telemetry now both require release for a chain. The capture milestone and its timestamp remain separate. The fake-clock regression covers unfinished release, release within the extended total cap, and capture after the original deadline. |
+| R2, chain event counts | Fixed in `550e190`: both `knockaway` and `t_knock` reset with the other per-episode counters. The carried-state regression begins with a prior count of seven and requires exactly one new event. |
+| R3, retry metadata | Fixed in `550e190`: the matrix archives an existing cell under `_superseded` and starts a fresh output directory. The recorder also replaces metadata from a retried index onward, validates the retained prefix, and removes a replaced episode's obsolete sidecar. The matrix regression verifies preserved evidence and distinct complete/incomplete retry results. Direct writer use intentionally retains unindexed later files; consumers must follow metadata. |
+| R4, blackout labels | Fixed in `550e190`: the parser permits intervening same-line diagnostics before `no_link`. Its regression includes reset/innovation suffixes, explicit false, and no label. |
+| R5, legacy cage fallback | Fixed before the primary execution snapshot; independently checked earlier in this review. |
+
+The lead reports 53 selected deterministic tests passed after integration. This review
+inspected the tests and changes without duplicating that suite while timed experiments
+were running. Supplemental chains are bookkeeping evidence, not 20 independent
+replicates or a new estimate of the original H20 effect.
+
+### Primary numerical checks
+
+An independent lightweight calculation from `fresh/results.json` verified all 15
+cells contain exactly seeds 1000–1029, have no cell error or stalled seed, and reproduce
+`3600 × successes / total duration`. The input hash in `statistics.json.corrected_run`
+matches the saved fresh result file. All six paired exact McNemar p-values were
+recomputed from the discordant outcomes; paired gross differences match the cell rates.
+
+Every displayed value in the integrated report's section 4 tables agrees with the
+saved artifacts at its reported precision. This includes the following decision-relevant
+figures:
+
+- Capture baseline: 21/30 at zero, 17/30 on relay, 212.4 → 153.9 gross demos/h,
+  72.5% rate retention, and a conservative success-retention lower bound of 0.439.
+  Its gross margin interval is −63.2 to +25.2 demos/h. The report correctly distinguishes
+  failure of the point-estimate target from proof that the population ratio is below it.
+- Peg baseline: 30/30 in each control, 833.3 → 819.4 gross demos/h, 98.3% retention,
+  and a conservative success-retention lower bound of 0.884. Both tasks still lack
+  the complete four-profile acceptance evidence set.
+- The six success comparisons and their Holm adjustments match the table. Capture
+  Twin at 400 ms has adjusted p = 0.064453125; its zero-adjusted success difference
+  is +16.7 percentage points [−3.3, +36.7], and its conditional throughput ratio of
+  ratios is 1.105 [0.941, 1.281]. The report does not overstate these as a confirmed
+  10% latency-specific benefit.
+- The two forced outage conditions each have 29/30 observed hold exposures. Only the
+  12-second condition has 29 episodes with hold command age above 10 seconds. Seed
+  1011 ends at approximately 5.57 seconds in both conditions, before the scheduled
+  outage. Success totals are 18/30 and 1/30; cage-event totals are 8 and 36.
+
+Reading the verification summary independently gives 354,402 ground frames, 5,127,213
+satellite cycles, 450 verified episodes, and zero reported audit errors. The largest
+cycle gap is 0.169063542 s. Both reported command-envelope violation counts are zero.
+The sampled actual-velocity peak is 6.584083557 rad/s at the Elbow in the 12-second
+outage cell, seed 1024, simulation time 19.914 s, outside hold. The report correctly
+separates this actual-motion result from the setpoint limit and notes unsampled peaks.
+
+### Scope correction requested during numerical review
+
+The initial integrated report said “task-goal geometry passed.” The recording verifier
+checks Capture's final target radius and Peg's final lateral distance; it does not
+replay the full Peg insertion-depth/contact predicate or Capture's dwell/grasp history.
+Use “terminal target-distance checks passed,” or state those limits explicitly, rather
+than imply independent reconstruction of every success predicate.
+
+A metadata-only diagnostic found 6 of 117 successful Peg endpoints with final tips
+slightly above the insertion-depth threshold, by at most 0.0878 mm. `_peg` evaluates
+the tip before updating the kinematic object pose, so its tested tip and final recorded
+pose need not be identical. This is consistent with the already disclosed discrete
+contact/predicate timing limitation; it is not evidence of an effect-size reversal or
+proof that those trajectories never met the criterion. It reinforces why the final
+audit claim must describe the checks actually performed. The lead was notified before
+final report integration.
+
+At the lead's request, this reviewer prepared a two-line correction that recomputes
+tip height and fixture contact after the kinematic pose update, immediately before
+the success predicate. It preserves the existing pre-update jam/regrasp behavior.
+The proposed regression checks a withdrawn tip, a newly inserted tip and a new
+final-pose contact. All three cases fail the current function and pass the candidate
+in an isolated in-memory check; no model or timed simulation was needed. The patch
+was supplied for integration separately. Fresh post-correction Peg checks and an
+updated source identifier are needed before claiming that final-runtime evidence;
+the 450-episode study remains attached to its original predicate and revision.
+
+The research scope remains explicit and adequate for this wave: corrected synthetic
+mechanism comparisons, complete attempt accounting, recording provenance and a revised
+research plan. Physical task validation, human transfer, contact safety, complete
+mission acceptance and incremental learned-policy value remain untested. Pending final
+chain and test-count paragraphs require their own completion evidence; they are not
+certified by this primary numerical review.
+
+## Final Peg correction resolution
+
+The proposed final-pose correction was integrated in `be7dd45`. The lead reports all
+nine tests in `test_sim_operator.py` passed, including the three new boundary/contact
+cases. This reviewer inspected `peg_check.py`, its manifest, the saved endpoint evidence
+and the three raw cell summaries without repeating timed experiments or the full suite.
+
+The checker restores the recorded final robot joint positions and object position and
+orientation into the Peg model, calls `mj_forward`, then checks lateral position,
+insertion depth and fixture contact at that common final pose. This addresses the
+specific stale-tip/contact defect. Its completeness, seed, outcome and execution-hash
+checks agree with the saved data. It intentionally checks successful endpoints and
+does not claim independent replay of the full trajectory or validation of failed cases.
+
+All 30 supplemental episodes succeeded: ten baseline-zero, ten baseline-relay and ten
+Terminal-at-400-ms episodes, each on seeds 4000–4009. Every reconstructed endpoint meets
+the final predicate and has no fixture contact. The smallest positive insertion-depth
+margin is approximately 0.000000713 m; the largest lateral error is approximately
+0.004699 m, below the implemented 0.014 m threshold. These are synthetic geometry
+checks at the model's numerical resolution, not physical tolerances or a new estimate
+of latency benefit. The result, manifest and current executable source hashes match.
+
+The supplemental chain evidence separately reports 20 verified episodes, complete
+coverage and no errors. Thus the saved studies contain 500 episodes in total, split
+as 450 primary comparisons on `0f68e78`, 20 dependent chain-regression episodes on
+`550e190`, and 30 Peg endpoint-regression episodes on `be7dd45`. Their distinct
+purposes and revisions must remain visible. The primary results are neither changed
+retroactively nor pooled with either supplemental study.
+
+No unresolved endpoint-correction finding remains from this review. The broad physical,
+human, mission-safety and policy-learning limits stated above still apply. Final full-suite
+completion was pending at this review point and belongs in the lead's verification record.

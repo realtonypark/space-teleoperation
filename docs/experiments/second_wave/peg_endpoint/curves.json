@@ -1,0 +1,40 @@
+{
+ "curves": [
+  {
+   "task": "peg",
+   "arm": "baseline",
+   "strategy": "baseline",
+   "tau_h": 0.17,
+   "block": "P3",
+   "points": [
+    {
+     "rtt_nominal_ms": 0.0,
+     "profile": "zero",
+     "success": 1.0,
+     "ci_lo": 0.7224672001371109,
+     "ci_hi": 1.0,
+     "demos_per_hour": 833.3333333333335,
+     "n": 10
+    }
+   ]
+  },
+  {
+   "task": "peg",
+   "arm": "terminal",
+   "strategy": "terminal",
+   "tau_h": 0.17,
+   "block": "P3",
+   "points": [
+    {
+     "rtt_nominal_ms": 400.0,
+     "profile": "sweep:400",
+     "success": 1.0,
+     "ci_lo": 0.7224672001371109,
+     "ci_hi": 1.0,
+     "demos_per_hour": 634.9206349206348,
+     "n": 10
+    }
+   ]
+  }
+ ]
+}

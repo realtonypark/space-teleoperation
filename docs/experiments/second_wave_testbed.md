@@ -89,13 +89,26 @@ episodes are not independent paired trials. The tether's spring dead band does n
 remove its damping while slack. No result from this task measures an unconstrained,
 force-free object throughout the episode.
 
-Two additional chain-only defects remain outside the source-frozen non-chain rerun:
+Two additional chain-only defects were found outside the source-frozen non-chain rerun:
 the returned `success` can be true at a reset timeout even when `released` is false,
 although a reusable chained demonstration requires the release; and the carried state
 resets cage/keep-out/jam counts but leaves `knockaway` and its debounce timestamp
 cumulative. Do not interpret historical chain success rates as completed reusable-demo
 rates or sum those per-episode knockaway counts as independent events. A chain-specific
-correction and fresh chain run are required before that claim.
+correction and fresh chain evidence are required before that claim. Revision `550e190` now
+requires completed release, charges the allowed reset extension, and resets both knockaway fields.
+Deterministic regressions cover capture without release, timely release and late capture. The
+supplemental four-chain study checks bookkeeping, not the original H20 effect size.
+
+The same revision archives replaced matrix cells under `_superseded`, replaces retried recorder
+metadata suffixes, retains blackout labels after optional diagnostics, normalizes the gross-rate
+field name and saves each scenario seed in outcome metadata. The 450 primary recordings retain
+their original source version and use the summary seed; they are not rewritten.
+
+The complete primary recording audit passed all 450 episodes and found a sampled actual joint
+speed maximum of 6.584 rad/s (Elbow, drop12, seed 1024, simulation time 19.914 s). Command-envelope
+violations remained zero. This is direct evidence that setpoint compliance is not actual-motion
+safety. See the [audit artifact](second_wave/record_verification.json).
 
 ## Status of previous findings
 
@@ -112,7 +125,7 @@ correction and fresh chain run are required before that claim.
 | T10 duty-cycle reporting | Short direct-GS episodes intentionally start in a contact window. They cannot by themselves measure whole-day availability. Geometry/duty-factor conversion needs its own assumptions. |
 | T11 dataset compatibility | Metadata was improved earlier. `.npz` files and jittered timestamps still do not directly satisfy a LeRobot loader. W2/W3 add scientific provenance, not a claimed loader conversion. |
 | T14 bandwidth | W6 fixes serialization/propagation composition and additionally fixes FIFO tie ordering. |
-| T15 peg contact timing | The simplified discrete contact/jam predicate remains; sub-step/contact-realism limits remain relevant. |
+| T15 peg contact timing | Final revision `be7dd45` recomputes completion depth/contact after the kinematic update. All 30 separate fresh endpoint checks pass. The primary 450 outcomes predate this final fix; physical/contact-model limits remain. |
 | T16 reachability | A task-imposed zero-latency ceiling remains. Normalize only with explicit absolute success and uncertainty; a fraction of a weak baseline is not an absolute feasibility threshold. |
 | T19 physical speed | A few benign ramp/step checks do not establish velocity/force safety under all contacts. New sidecars enable broader actual-state checks. |
 | T20 statistics | Statistical estimator and aggregation corrections are handled by the separate second-wave evidence audit. |

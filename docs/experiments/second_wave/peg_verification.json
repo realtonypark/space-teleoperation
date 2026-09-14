@@ -1,0 +1,279 @@
+{
+  "passed": true,
+  "verified_episodes": 30,
+  "source_hash": "1a28ef41c099bbaa2f05427dbfbbdc1ad44e6a7b3f14f11f2dbc1d30c6628c1e",
+  "method": "Reconstruct final joint/object pose; check lateral position, depth and fixture contact.",
+  "limitation": "Endpoint regression only; no trajectory replay, physical validation or paired effect estimate.",
+  "episodes": [
+    {
+      "cell": "P3_peg_baseline_zero_tau0.17",
+      "seed": 4000,
+      "success": true,
+      "lateral_m": 0.000869326158258616,
+      "insertion_depth_margin_m": 3.0250044618172767e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_zero_tau0.17",
+      "seed": 4001,
+      "success": true,
+      "lateral_m": 0.0008504024367532231,
+      "insertion_depth_margin_m": 3.138101803244059e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_zero_tau0.17",
+      "seed": 4002,
+      "success": true,
+      "lateral_m": 0.001062295515599241,
+      "insertion_depth_margin_m": 1.6873640085741937e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_zero_tau0.17",
+      "seed": 4003,
+      "success": true,
+      "lateral_m": 0.000996607751681124,
+      "insertion_depth_margin_m": 3.196775139460012e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_zero_tau0.17",
+      "seed": 4004,
+      "success": true,
+      "lateral_m": 0.0045745557605054495,
+      "insertion_depth_margin_m": 1.3404859735881292e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_zero_tau0.17",
+      "seed": 4005,
+      "success": true,
+      "lateral_m": 0.002262558745809158,
+      "insertion_depth_margin_m": 2.670413181932868e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_zero_tau0.17",
+      "seed": 4006,
+      "success": true,
+      "lateral_m": 0.00110998095624789,
+      "insertion_depth_margin_m": 1.3835992349817139e-06,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_zero_tau0.17",
+      "seed": 4007,
+      "success": true,
+      "lateral_m": 0.0011207968093997686,
+      "insertion_depth_margin_m": 3.520589440549754e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_zero_tau0.17",
+      "seed": 4008,
+      "success": true,
+      "lateral_m": 0.001525624024325723,
+      "insertion_depth_margin_m": 4.550163628134346e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_zero_tau0.17",
+      "seed": 4009,
+      "success": true,
+      "lateral_m": 0.00019199131686773818,
+      "insertion_depth_margin_m": 5.9570215928138326e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_leo_relay_tau0.17",
+      "seed": 4000,
+      "success": true,
+      "lateral_m": 0.000827125038444639,
+      "insertion_depth_margin_m": 3.828796158534403e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_leo_relay_tau0.17",
+      "seed": 4001,
+      "success": true,
+      "lateral_m": 0.0007458900655827773,
+      "insertion_depth_margin_m": 4.920826137642942e-06,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_leo_relay_tau0.17",
+      "seed": 4002,
+      "success": true,
+      "lateral_m": 0.0008533151522332153,
+      "insertion_depth_margin_m": 3.156859401395179e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_leo_relay_tau0.17",
+      "seed": 4003,
+      "success": true,
+      "lateral_m": 0.0010449682609166677,
+      "insertion_depth_margin_m": 1.514020727932247e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_leo_relay_tau0.17",
+      "seed": 4004,
+      "success": true,
+      "lateral_m": 0.0046994722687023135,
+      "insertion_depth_margin_m": 5.401918650830423e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_leo_relay_tau0.17",
+      "seed": 4005,
+      "success": true,
+      "lateral_m": 0.0025243953330621256,
+      "insertion_depth_margin_m": 7.125757105555519e-07,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_leo_relay_tau0.17",
+      "seed": 4006,
+      "success": true,
+      "lateral_m": 0.0013794491282322944,
+      "insertion_depth_margin_m": 1.6036482509827754e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_leo_relay_tau0.17",
+      "seed": 4007,
+      "success": true,
+      "lateral_m": 0.0012286452773322967,
+      "insertion_depth_margin_m": 2.0720770649886033e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_leo_relay_tau0.17",
+      "seed": 4008,
+      "success": true,
+      "lateral_m": 0.0015726970373841156,
+      "insertion_depth_margin_m": 2.8071046460485805e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_baseline_leo_relay_tau0.17",
+      "seed": 4009,
+      "success": true,
+      "lateral_m": 0.0002798298124097961,
+      "insertion_depth_margin_m": 9.293465055621591e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_terminal_sweep400_tau0.17",
+      "seed": 4000,
+      "success": true,
+      "lateral_m": 0.001304413453642258,
+      "insertion_depth_margin_m": 3.309758489715431e-06,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_terminal_sweep400_tau0.17",
+      "seed": 4001,
+      "success": true,
+      "lateral_m": 0.0012527982516692857,
+      "insertion_depth_margin_m": 7.312536705442879e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_terminal_sweep400_tau0.17",
+      "seed": 4002,
+      "success": true,
+      "lateral_m": 0.001298352463033123,
+      "insertion_depth_margin_m": 7.78327626822714e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_terminal_sweep400_tau0.17",
+      "seed": 4003,
+      "success": true,
+      "lateral_m": 0.0015265218041298858,
+      "insertion_depth_margin_m": 0.00011129886156748675,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_terminal_sweep400_tau0.17",
+      "seed": 4004,
+      "success": true,
+      "lateral_m": 0.0024062494655983555,
+      "insertion_depth_margin_m": 9.461489484489938e-06,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_terminal_sweep400_tau0.17",
+      "seed": 4005,
+      "success": true,
+      "lateral_m": 0.00085167401781595,
+      "insertion_depth_margin_m": 1.0765498970680132e-06,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_terminal_sweep400_tau0.17",
+      "seed": 4006,
+      "success": true,
+      "lateral_m": 0.001254199604061164,
+      "insertion_depth_margin_m": 5.277721018642073e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_terminal_sweep400_tau0.17",
+      "seed": 4007,
+      "success": true,
+      "lateral_m": 0.0012918813975882218,
+      "insertion_depth_margin_m": 1.4970408890237208e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_terminal_sweep400_tau0.17",
+      "seed": 4008,
+      "success": true,
+      "lateral_m": 0.001296830747053723,
+      "insertion_depth_margin_m": 5.61927682226418e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    },
+    {
+      "cell": "P3_peg_terminal_sweep400_tau0.17",
+      "seed": 4009,
+      "success": true,
+      "lateral_m": 0.0012534355375608433,
+      "insertion_depth_margin_m": 3.5134140480265474e-05,
+      "fixture_contact": false,
+      "terminal_predicate": true
+    }
+  ]
+}

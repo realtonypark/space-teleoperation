@@ -1,0 +1,346 @@
+{
+  "passed": true,
+  "complete": true,
+  "cells": [
+    {
+      "name": "C2000_capture_chain_baseline_leo_relay_tau0.17",
+      "episodes": [
+        {
+          "ep": 0,
+          "seed": 2000,
+          "success": true,
+          "released": true,
+          "duration_s": 10.580211708089337,
+          "reset_s": 0.5503117910120636,
+          "ground_frames": 524,
+          "satellite_cycles": 7380,
+          "sim_start_s": 0.0,
+          "sim_last_sample_s": 10.576000000000201,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 1,
+          "seed": 2001,
+          "success": true,
+          "released": true,
+          "duration_s": 6.559497874928638,
+          "reset_s": 0.5642448330763727,
+          "ground_frames": 320,
+          "satellite_cycles": 4664,
+          "sim_start_s": 10.578000000000202,
+          "sim_last_sample_s": 17.13600000000138,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 2,
+          "seed": 2002,
+          "success": true,
+          "released": true,
+          "duration_s": 6.480969290947542,
+          "reset_s": 0.5600169159006327,
+          "ground_frames": 318,
+          "satellite_cycles": 4412,
+          "sim_start_s": 17.13800000000138,
+          "sim_last_sample_s": 23.61799999999779,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 3,
+          "seed": 2003,
+          "success": true,
+          "released": true,
+          "duration_s": 6.484591250075027,
+          "reset_s": 0.5470846660900861,
+          "ground_frames": 317,
+          "satellite_cycles": 4372,
+          "sim_start_s": 23.619999999997788,
+          "sim_last_sample_s": 30.103999999994194,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 4,
+          "seed": 2004,
+          "success": true,
+          "released": true,
+          "duration_s": 6.628488041926175,
+          "reset_s": 0.6160594578832388,
+          "ground_frames": 322,
+          "satellite_cycles": 4365,
+          "sim_start_s": 30.105999999994193,
+          "sim_last_sample_s": 36.731999999998926,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        }
+      ],
+      "seed0": 2000,
+      "reset_mode": "free",
+      "source_hash": "22b6d1e5dfc8641c9ed0b74ef0f4ee4950c37de7811059aa0c6e80f0e2b43de0",
+      "input_sha256": {
+        "summary.json": "6accc028e5920204dbd8c2e53759bc6c37e7f7012ec280481af1fd5c294f0122",
+        "episodes.jsonl": "bb3dc052ac4eaed61231ea0405de084a4180c245963326c1ee5cb3f4cb127907",
+        "info.json": "4a4d6a4da231cbf3fcd83ea1723590c319848fb97179239f4fef3b12f452f6e0"
+      }
+    },
+    {
+      "name": "C2000_capture_chain_teleop_baseline_leo_relay_tau0.17",
+      "episodes": [
+        {
+          "ep": 0,
+          "seed": 2000,
+          "success": true,
+          "released": true,
+          "duration_s": 14.340336417080835,
+          "reset_s": 3.9517168749589473,
+          "ground_frames": 711,
+          "satellite_cycles": 9907,
+          "sim_start_s": 0.0,
+          "sim_last_sample_s": 14.336000000001457,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 1,
+          "seed": 2001,
+          "success": true,
+          "released": true,
+          "duration_s": 7.777588916942477,
+          "reset_s": 3.864741666940972,
+          "ground_frames": 383,
+          "satellite_cycles": 5207,
+          "sim_start_s": 14.338000000001458,
+          "sim_last_sample_s": 22.113999999998622,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 2,
+          "seed": 2002,
+          "success": true,
+          "released": true,
+          "duration_s": 7.589590166928247,
+          "reset_s": 3.796074624871835,
+          "ground_frames": 373,
+          "satellite_cycles": 5163,
+          "sim_start_s": 22.11599999999862,
+          "sim_last_sample_s": 29.703999999994416,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 3,
+          "seed": 2003,
+          "success": true,
+          "released": true,
+          "duration_s": 7.671647832961753,
+          "reset_s": 3.844174083089456,
+          "ground_frames": 376,
+          "satellite_cycles": 5129,
+          "sim_start_s": 29.705999999994415,
+          "sim_last_sample_s": 37.37199999999971,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 4,
+          "seed": 2004,
+          "success": true,
+          "released": true,
+          "duration_s": 7.953672666102648,
+          "reset_s": 3.849219750147313,
+          "ground_frames": 389,
+          "satellite_cycles": 4990,
+          "sim_start_s": 37.37399999999971,
+          "sim_last_sample_s": 45.32600000000943,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        }
+      ],
+      "seed0": 2000,
+      "reset_mode": "teleop",
+      "source_hash": "22b6d1e5dfc8641c9ed0b74ef0f4ee4950c37de7811059aa0c6e80f0e2b43de0",
+      "input_sha256": {
+        "summary.json": "63c5ee0f1acb2ec2bff59b867450bdd4097e52899bcbadcf8987dc2abc0a1ec3",
+        "episodes.jsonl": "71d0cdccdf3052f230a620472f57e584849998a74422e5dc7bfababde1ed371f",
+        "info.json": "f44c414962a2ecf6ca34c7d948909ead36b7a5274319cb257ce36710bf751bcc"
+      }
+    },
+    {
+      "name": "C3000_capture_chain_baseline_leo_relay_tau0.17",
+      "episodes": [
+        {
+          "ep": 0,
+          "seed": 3000,
+          "success": true,
+          "released": true,
+          "duration_s": 9.043950124876574,
+          "reset_s": 0.5840605839621276,
+          "ground_frames": 445,
+          "satellite_cycles": 5961,
+          "sim_start_s": 0.0,
+          "sim_last_sample_s": 9.041999999999689,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 1,
+          "seed": 3001,
+          "success": true,
+          "released": true,
+          "duration_s": 6.637307999888435,
+          "reset_s": 0.5357464998960495,
+          "ground_frames": 326,
+          "satellite_cycles": 4752,
+          "sim_start_s": 9.04399999999969,
+          "sim_last_sample_s": 15.680000000001906,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 2,
+          "seed": 3002,
+          "success": true,
+          "released": true,
+          "duration_s": 6.418853957904503,
+          "reset_s": 0.5683007079642266,
+          "ground_frames": 314,
+          "satellite_cycles": 4527,
+          "sim_start_s": 15.682000000001906,
+          "sim_last_sample_s": 22.09999999999863,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 3,
+          "seed": 3003,
+          "success": true,
+          "released": true,
+          "duration_s": 6.615114332875237,
+          "reset_s": 0.5473479158245027,
+          "ground_frames": 324,
+          "satellite_cycles": 4770,
+          "sim_start_s": 22.10199999999863,
+          "sim_last_sample_s": 28.715999999994963,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 4,
+          "seed": 3004,
+          "success": true,
+          "released": true,
+          "duration_s": 6.638973624911159,
+          "reset_s": 0.5682459999807179,
+          "ground_frames": 326,
+          "satellite_cycles": 4808,
+          "sim_start_s": 28.717999999994962,
+          "sim_last_sample_s": 35.355999999997245,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        }
+      ],
+      "seed0": 3000,
+      "reset_mode": "free",
+      "source_hash": "22b6d1e5dfc8641c9ed0b74ef0f4ee4950c37de7811059aa0c6e80f0e2b43de0",
+      "input_sha256": {
+        "summary.json": "bf753ccdd94f258c8701a784fcc47f474e3053d24d21acb8c2f0a8f28256a5e1",
+        "episodes.jsonl": "eb319e27fb081a4d0b2aa77e160ab71dc17f8b46b3d9d75bc6001fdb26fd384a",
+        "info.json": "5db40a4ad8eb6f630c366ce48a6a17089b0cae2e9a78be952c65bee38b8b7d59"
+      }
+    },
+    {
+      "name": "C3000_capture_chain_teleop_baseline_leo_relay_tau0.17",
+      "episodes": [
+        {
+          "ep": 0,
+          "seed": 3000,
+          "success": true,
+          "released": true,
+          "duration_s": 12.32559858309105,
+          "reset_s": 3.8657591671217233,
+          "ground_frames": 609,
+          "satellite_cycles": 8333,
+          "sim_start_s": 0.0,
+          "sim_last_sample_s": 12.324000000000785,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 1,
+          "seed": 3001,
+          "success": true,
+          "released": true,
+          "duration_s": 7.583606207976118,
+          "reset_s": 3.8407670829910785,
+          "ground_frames": 373,
+          "satellite_cycles": 5011,
+          "sim_start_s": 12.326000000000786,
+          "sim_last_sample_s": 19.907999999999845,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 2,
+          "seed": 3002,
+          "success": true,
+          "released": true,
+          "duration_s": 7.601399041945115,
+          "reset_s": 3.8098932921420783,
+          "ground_frames": 373,
+          "satellite_cycles": 5528,
+          "sim_start_s": 19.909999999999844,
+          "sim_last_sample_s": 27.50999999999563,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 3,
+          "seed": 3003,
+          "success": true,
+          "released": true,
+          "duration_s": 7.627091959118843,
+          "reset_s": 3.856007209047675,
+          "ground_frames": 374,
+          "satellite_cycles": 5476,
+          "sim_start_s": 27.51199999999563,
+          "sim_last_sample_s": 35.13799999999698,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        },
+        {
+          "ep": 4,
+          "seed": 3004,
+          "success": true,
+          "released": true,
+          "duration_s": 7.866614957805723,
+          "reset_s": 3.841827749973163,
+          "ground_frames": 387,
+          "satellite_cycles": 5324,
+          "sim_start_s": 35.13999999999698,
+          "sim_last_sample_s": 43.006000000006594,
+          "observed_hold_s": 0.0,
+          "command_envelope_violations": 0
+        }
+      ],
+      "seed0": 3000,
+      "reset_mode": "teleop",
+      "source_hash": "22b6d1e5dfc8641c9ed0b74ef0f4ee4950c37de7811059aa0c6e80f0e2b43de0",
+      "input_sha256": {
+        "summary.json": "503ed36680629e6f9d37bcf6057243d0f7683d787db1894f5358832ba9c09afe",
+        "episodes.jsonl": "e7d16ea0ce6983a141f6e7da41091d6badf72b6172c4cc1d3535b17e106a3e06",
+        "info.json": "025a500dcf510e143dc4fadac00da5bd83af77e4a16d2033d84379e0a1e51aa3"
+      }
+    }
+  ],
+  "errors": [],
+  "interpretation": "Four dependent episode chains; bookkeeping regression, not 20 IID performance observations.",
+  "limitations": [
+    "SAT state is sampled before physics; terminal state is separate metadata.",
+    "Newest-received command identity does not identify the sole interpolation source.",
+    "Command-envelope checks do not establish physical safety or pad-contact coverage."
+  ],
+  "verified_episodes": 20
+}

@@ -192,7 +192,7 @@ def main():
             return [clean(x) for x in v]
         return v
     (OUT / 'statistics.json').write_text(json.dumps(clean(result), indent=2, allow_nan=False) + '\n')
-    print(f'{len(full)} Tier-2 cells; {sum(c["n"] for c in fresh)} fresh episodes -> {OUT / "statistics.json"}')
+    print(f'{len(full)} Tier-2 cells; {sum(c["n"] for c in fresh)} held-out historical episodes -> {OUT / "statistics.json"}')
 
 
 if __name__ == '__main__':

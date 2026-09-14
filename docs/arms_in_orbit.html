@@ -1,4 +1,10 @@
-<title>Arms in Orbit</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Second-wave evidence for ground teleoperation in LEO: corrected experiments, mission readiness, and the learning-value study still required.">
+<title>Arms in Orbit · Second-wave research</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 :root{
@@ -54,114 +60,131 @@ ul{padding-left:20px;margin:0 0 14px}li{margin-bottom:6px}
 a{color:var(--blue)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .note{font-size:13.5px;color:var(--ink2);border-left:3px solid var(--grid);padding-left:14px;margin:10px 0 18px}
+caption{text-align:left;color:var(--ink2);font-size:13px;margin-bottom:10px}
+section:target{scroll-margin-top:24px}
 </style>
+</head>
+<body>
 
+
+<main>
 <div class="wrap">
-<div class="eyebrow">Research program · 2026-09-12 to 2026-09-13 · autonomous agent fleet</div>
+<div class="eyebrow">Second-wave research · reviewed 2026-09-13</div>
 <h1>Arms in Orbit</h1>
-<p class="lede">Can people on Earth teleoperate simple robot arms inside a rideshare-class satellite well enough to collect physical-AI demonstrations that no Earth-side simulation or lab can produce? A research fleet answered with literature, a socket-level testbed, 20 hypotheses, 9,700 emulated episodes, two adversarial audits and an independent reproduction.</p>
+<p class="lede">Ground teleoperation remains a promising way to collect microgravity demonstrations. Corrected experiments and a deeper evidence review support continued prototype development. Flight readiness and added learning value remain open.</p>
+<p class="note" style="margin-top:22px">This review supersedes the first wave’s feasibility and confirmation claims. <a href="arms_in_orbit_wave1.html">Read the preserved first-wave page</a> or the <a href="REPORT_WAVE1.md">archived report</a>.</p>
 
-<div class="verdict">
-  <div><div class="k">Verdict</div><div class="v">Conditional yes</div><div class="s">Feasible with hardware buyable in 2026, on a Starlink mini-laser relay whose first third-party flights are Q1 2027, or pass-limited at 21 % duty on four polar ground stations.</div></div>
-  <div><div class="k">Relay round trip, emulated</div><div class="v">42 ms</div><div class="s">p50 measured on the relay profile (48 ms nominal, p95 68 ms), plus a 15 s spike to about 125 ms and 1.7 outages per hour. Every arm passes the 80 % acceptance gate here.</div></div>
-  <div><div class="k">Link-caused unsafe motion</div><div class="v">0</div><div class="s">Across 9,700 episodes on every profile, including forced 1 s and 12 s blackouts that exercised hold and retract 30 times each per arm.</div></div>
+<div class="verdict" aria-label="Three separate evidence gates">
+  <div><div class="k">1 · Collection</div><div class="v">Prototype</div><div class="s">Synthetic tasks show useful control mechanisms. Human performance and physical task fidelity still need validation.</div></div>
+  <div><div class="k">2 · Flight</div><div class="v">Open</div><div class="s">Close spacecraft resources, qualified hardware, mission-specific communications and local fault recovery.</div></div>
+  <div><div class="k">3 · Learning</div><div class="v">Untested</div><div class="s">Show that measured microgravity demonstrations improve held-out physical performance at equal training budget.</div></div>
 </div>
 
-<h2>What the numbers say</h2>
-<p>The satellite never runs a model. It plays a 50 Hz stream of joint setpoints through a 30 ms buffer, holds after 300 ms of silence and stows after 10 s. On the relay link that baseline already meets the acceptance criterion for both tasks. Latency only starts to bite past the relay: coarse capture of a drifting box degrades from about 250 ms round trip, and 6 mm-clearance peg insertion from about 100 ms.</p>
-</div>
-
-<div class="wide">
-<div class="charts">
-  <div class="chart"><h3>Capture a drifting, tumbling box</h3><p class="sub">Success vs nominal RTT · 30 seeds per point · shaded band is the baseline's 95 % Wilson CI</p><svg id="c1" viewBox="0 0 520 320" role="img" aria-label="Capture success versus round-trip time for six strategies"></svg></div>
-  <div class="chart"><h3>Insert a peg, 6 mm clearance</h3><p class="sub">Same axes · the onboard terminal primitive never fails; the ground copy of it fails from 100 ms</p><svg id="c2" viewBox="0 0 520 320" role="img" aria-label="Peg insertion success versus round-trip time for six strategies"></svg></div>
-</div>
-<div class="legend"><span class="b">Baseline</span><span class="t">Twin (ground prediction)</span><span class="p">Terminal (onboard grasp primitive)</span><span class="pg">Terminal, ground ablation</span><span class="d">DeadReckon (satellite extrapolation)</span><span class="g">Gain (RTT-scaled speed)</span></div>
-<p class="note" style="max-width:100ch;margin-top:14px">Dashed vertical: the relay profile at 48 ms. Dotted horizontal: 80 % of each task's zero-latency success, the acceptance line. Zero-latency capture tops out near 0.67 because 7 of 30 spawn seeds drift out of reach before any operator could catch them; every arm shares those seeds.</p>
-</div>
-
-<div class="wrap">
-<h2>Five hypotheses, head to head</h2>
-<p>Twenty hypothesis agents were given one axis and one angle each and told to abstain rather than pad. Seven abstained with measured arguments. Five verifier agents scored the rest, a selection agent merged near-duplicates, and five strategies went into a paired 100-seed confirmation against the baseline. Each is judged by the reject criterion its own author wrote.</p>
+<h2>What the second wave improves</h2>
+<p>The goal is unchanged: four concurrent ground operators and four to eight simple arms inside a rideshare-class LEO spacecraft. The review now separates a task completed in a simulator from a usable demonstration, an operable mission and a better learned policy.</p>
 <div class="tscroll"><table>
-<tr><th>Strategy</th><th>Mechanism</th><th>Decisive cell (100 paired seeds)</th><th class="n">Δ success</th><th class="n">McNemar p</th><th>Verdict</th></tr>
-<tr><td><b>Twin</b> (H10)</td><td>Operator acts on a ground-side prediction: the arm as the setpoints already in flight at now − 170 ms, the object dead-reckoned over the link delay.</td><td>capture, 400 ms · capture, GEO 600 ms</td><td class="n">+0.28 · +0.38</td><td class="n">&lt;10⁻⁴</td><td><span class="pill ok">Confirmed</span><br><small>Knee 250 → 787 ms. Null at zero latency, as required.</small></td></tr>
-<tr><td><b>Terminal</b> (H11, onboard-compute branch)</td><td>When the operator commands the jaw closed within 8 cm, the satellite closes the last segment with a local zero-latency servo, bounded to 2 s.</td><td>peg, 400 ms · capture, 500 ms</td><td class="n">+0.99 · +0.17</td><td class="n">&lt;10⁻⁴ · 0.0009</td><td><span class="pill ok">Confirmed</span><br><small>Insertion 1 → 100 %. The ground-side ablation scores 0 %: the entire gain is onboard compute.</small></td></tr>
-<tr><td><b>DeadReckon</b> (H12)</td><td>Satellite extrapolates the command stream 60 ms ahead along a least-squares line in sequence time; freezes past 100 ms of silence.</td><td>peg, 250 ms · capture, 250 ms</td><td class="n">+0.77 · +0.05</td><td class="n">&lt;10⁻⁴ · 0.27</td><td><span class="pill part">Partial</span><br><small>Rescues insertion up to its horizon, then collapses at 400 ms. No effect on capture. Fits the rad-tolerant supervisor.</small></td></tr>
-<tr><td><b>Gain</b> (H14)</td><td>Ground scales the operator's speed by measured loop delay so the overshoot-and-chase instability never starts.</td><td>peg, 250 ms · capture, 400 ms</td><td class="n">+0.84 · −0.41</td><td class="n">&lt;10⁻⁴ · &lt;10⁻⁴</td><td><span class="pill part">Task-dependent</span><br><small>Holds insertion at 93 % out to 1000 ms; makes capture impossible because the slowed arm cannot catch a 2 to 5 cm/s box. Rejected as default-on by its own clause (ii).</small></td></tr>
-<tr><td><b>Chained release</b> (H20)</td><td>Each demonstration ends by re-releasing the object toward the next target, so no teleoperated reset is needed.</td><td>capture_chain, relay, 30 seeds</td><td class="n">gross demos/h 473 vs 390</td><td class="n">—</td><td><span class="pill ok">Confirmed</span><br><small>Reset wall time 1.8 s vs 5.1 s; +21 % gross throughput, success unchanged at 100 %.</small></td></tr>
-</table></div>
+<caption>Corrections that change how the results should be read</caption>
+<thead><tr><th scope="col">Correction</th><th scope="col">Why it matters</th></tr></thead>
+<tbody>
+<tr><th scope="row">Freeze terminal outcomes</th><td>Physics now stops at success or the episode deadline. The old one-second reporting interval could convert a timed-out failure into success.</td></tr>
+<tr><th scope="row">Count every attempt</th><td>Blackouts, including the first episode, remain failed attempts. The historical Tier-2 parser omitted four NO_LINK failures.</td></tr>
+<tr><th scope="row">Charge failure time</th><td>Collection rate includes the duration of unsuccessful attempts. Missing required profiles or safety counters yield incomplete evidence.</td></tr>
+<tr><th scope="row">Record causal provenance</th><td>Commands match the observations that caused them. Schema 2 also records actual simulated state, object pose, timing and terminal outcome.</td></tr>
+<tr><th scope="row">Correct network handling</th><td>Propagation follows serialization; equal-time packets retain arrival order. Packet decoders reject nonfinite numerical values.</td></tr>
+</tbody></table></div>
+<p>These fixes improve internal validity. They do not supply camera perception, force measurements, human demonstrations or a validated spacecraft model. <a href="experiments/second_wave_testbed.md">Read the testbed audit</a>.</p>
 
-<h2>Where the latency actually goes</h2>
-<p>On the relay path the human is half the loop. The link both ways is 14 %. Attacking the link alone can never move the knee much; attacking what the operator sees (Twin) or what the satellite finishes on its own (Terminal) can.</p>
-<div class="budget">
-  <div class="bar" aria-label="Latency budget, 333 ms total">
-    <div class="v" style="width:16.5%">video 55</div><div class="l" style="width:5.4%">18</div><div class="h" style="width:51%">human 170</div><div class="v" style="width:3.6%">12</div><div class="l" style="width:9%">30</div><div class="sat" style="width:9%">sat 30</div><div class="v" style="width:2.4%">8</div><div class="m" style="width:3%"></div>
-  </div>
-  <div class="bkey"><span><i style="background:var(--muted)"></i>sensor, encode, jitter buffer, decode, display, input, actuation</span><span><i style="background:var(--accent)"></i>relay link down 18 ms, up 30 ms</span><span><i style="background:var(--ink2)"></i>human visuomotor correction 170 ms</span><span><i style="background:var(--violet)"></i>satellite playout buffer 30 ms</span></div>
-  <p class="note">Sum 333 ms; machine loop without the human 163 ms. Sources: SYNTHESIS §8 from the hardware, bandwidth and fundamentals reports.</p>
-</div>
+<section id="fresh-results" aria-labelledby="fresh-title">
+<h2 id="fresh-title">Corrected experiments</h2>
+<p><span class="pill ok">450 episodes complete</span></p>
+<p>All <b>15 cells × 30 episodes</b> completed on seeds <b>1000–1029</b>, outside the first wave’s 0–99 range. No episodes are missing; no errors or satellite cycles above the 200 ms stall threshold were recorded. Historical and corrected outcomes are kept separate.</p>
+<div class="tscroll"><table id="fresh-table">
+<caption>Corrected implementation · success count [95% Wilson interval] · gross rate includes failed-attempt time</caption>
+<thead><tr><th scope="col">Task / scenario</th><th scope="col">Strategy</th><th scope="col">Success</th><th scope="col" class="n">Gross<br>demos/h</th></tr></thead>
+<tbody>
+<tr><td>Capture / zero</td><td>Baseline</td><td>21/30<br><small>[52.1%, 83.3%]</small></td><td class="n">212.4</td></tr>
+<tr><td>Capture / relay</td><td>Baseline</td><td>17/30<br><small>[39.2%, 72.6%]</small></td><td class="n">153.9</td></tr>
+<tr><td>Capture / zero</td><td>Twin</td><td>24/30<br><small>[62.7%, 90.5%]</small></td><td class="n">285.1</td></tr>
+<tr><td>Capture / 400 ms</td><td>Baseline</td><td>13/30<br><small>[27.4%, 60.8%]</small></td><td class="n">96.5</td></tr>
+<tr><td>Capture / 400 ms</td><td>Twin</td><td>21/30<br><small>[52.1%, 83.3%]</small></td><td class="n">202.8</td></tr>
+<tr><td>Capture / 400 ms</td><td>Gain</td><td>0/30<br><small>[0.0%, 11.4%]</small></td><td class="n">0.0</td></tr>
+<tr><td>Peg / zero</td><td>Baseline</td><td>30/30<br><small>[88.6%, 100.0%]</small></td><td class="n">833.3</td></tr>
+<tr><td>Peg / relay</td><td>Baseline</td><td>30/30<br><small>[88.6%, 100.0%]</small></td><td class="n">819.4</td></tr>
+<tr><td>Peg / 250 ms</td><td>Baseline</td><td>0/30<br><small>[0.0%, 11.4%]</small></td><td class="n">0.0</td></tr>
+<tr><td>Peg / 250 ms</td><td>DeadReckon</td><td>27/30<br><small>[74.4%, 96.5%]</small></td><td class="n">397.7</td></tr>
+<tr><td>Peg / 400 ms</td><td>Baseline</td><td>0/30<br><small>[0.0%, 11.4%]</small></td><td class="n">0.0</td></tr>
+<tr><td>Peg / 400 ms</td><td>Terminal</td><td>30/30<br><small>[88.6%, 100.0%]</small></td><td class="n">634.9</td></tr>
+<tr><td>Peg / 400 ms</td><td>TerminalGround</td><td>0/30<br><small>[0.0%, 11.4%]</small></td><td class="n">0.0</td></tr>
+<tr><td>Capture / relay + 1 s outage</td><td>Baseline</td><td>18/30<br><small>[42.3%, 75.4%]</small></td><td class="n">166.2</td></tr>
+<tr><td>Capture / relay + 12 s outage</td><td>Baseline</td><td>1/30<br><small>[0.6%, 16.7%]</small></td><td class="n">4.1</td></tr>
+</tbody></table></div>
+<p><b>Relay performance depends on the task.</b> Capture retains 81.0% of zero-delay success (17/30 versus 21/30), but only <b>72.5% of gross throughput</b> (153.9 versus 212.4 demos/h), below the 80% point target. The conservative 95% lower bound on its success ratio is 43.9%. Peg retains 30/30 success and 98.3% of gross throughput. Neither task completes the full mission acceptance gate: direct-pass/GEO profiles are absent from this targeted run, and physical safety remains unproven.</p>
+<p><b>Twin helps the delayed Capture proxy, with limited statistical certainty.</b> At 400 ms, success rises from 13/30 to 21/30 and gross rate from 96.5 to 202.8 demos/h. The gross-rate difference is +106.3 [38.1, 187.5] demos/h in a pointwise paired bootstrap interval. Success has Holm-adjusted p = .0645 across six comparisons; it does not cross .05 after adjustment. Twin also improves zero-delay gross rate. After that control, the conditional speed ratio of ratios is 1.105 [0.941, 1.281], which does not establish a ≥10% latency-specific gain.</p>
+<p><b>The clearest corrected effects remain task-specific.</b> Gain reduces 400 ms Capture to 0/30 (Holm p = .000977). Peg at 250 ms improves from 0/30 to 27/30 with DeadReckon (p = 7.45 × 10⁻⁸); at 400 ms, Terminal improves 0/30 to 30/30 (p = 1.12 × 10⁻⁸). TerminalGround remains 0/30. Local and ground assistance still differ in sensing, state age and update rate, so this does not isolate compute placement.</p>
+<p class="note">Endpoint review found six of 117 successful Peg records up to 0.088 mm above the specified depth because the primary execution checked the previous pose. The final code checks updated pose and contact; primary outcomes remain tied to their original revision. The frame audit checks target distance and record consistency, not a full replay of every task predicate. The final correction passed 30 fresh endpoints (10 each for baseline zero/relay and Terminal at 400 ms), with final depth, lateral position and fixture contact independently reconstructed from saved state. These are separate regression observations. See the <a href="REPORT.md">report</a>.</p>
+<p class="note">Paired seeds control scenario generation, not identical socket schedules. Capture deadlines are 20 s, except 30 s for the 12 s outage; Peg uses 30 s. Synthetic reaction delay is 170 ms. The relay’s 48 ms nominal RTT is an emulation scenario, not a measured spacecraft service. Bootstrap intervals are pointwise; 30/30 success is not a population guarantee.</p>
+<p><b>Outage exposure is measured.</b> Hold occurs in 29/30 episodes for each forced-outage profile; 29/30 enter the retract-age regime for the 12 s outage. One episode in each cell ends before the outage. The long-outage cell’s sole success is that unexposed episode, so it does not demonstrate successful recovery through the full blackout.</p>
+<p><a href="experiments/second_wave/fresh/results.json">All corrected data</a> · <a href="experiments/second_wave/fresh/paired.md">Paired comparisons</a> · <a href="experiments/second_wave/statistics.json">Statistical analysis</a> · <a href="experiments/second_wave_plan.md">Fixed protocol</a> · <a href="experiments/second_wave/manifest.json">Run manifest and source hashes</a></p>
+</section>
 
-<h2>The recommended architecture</h2>
-<pre>
- OPERATORS (4)             GROUND                     SPACE  (ESPA-class bus, 1 atm cylinder, 4 arms)
- leader-follower / VR  →  session broker  ─┐        ┌─ 2× Starlink mini-laser terminals  (primary, 48 ms)
- no force feedback        1 writer / arm   ├─ UDP ──┤   X-band down + S-band up            (fallback, passes)
- 50 Hz setpoints, 40 B    observers fan out│  50 Hz  │   IDRS / Iridium L-band              (safety heartbeat)
- twin view (Twin)         LeRobot v2.1 log ┘        └─ SUPERVISOR MCU (rad-tolerant):  30 ms playout · hold 300 ms
-                                                        retract 10 s · ramp-limited resume · joint/keep-out clamps
-                                                        optional: terminal-grasp primitive (needs Jetson pose)
-                                                      JETSON ORIN NX: 4–8 global-shutter cams, NVENC 720p30,
-                                                        ~1 Mb/s per live stream, 10.4 Mb/s down for 4 operators
-</pre>
+<h2>Which historical signals survive scrutiny?</h2>
+<p>The strongest task-specific gains persist in a reanalysis of seeds 30–99, which were outside the original 30-seed screen. These are <b>historical outcomes under the old implementation</b>. They support choosing mechanisms for new tests; they do not validate the corrections above.</p>
+<div class="tscroll"><table>
+<caption>Archived implementation · 70 paired scenarios per row · pp = percentage points</caption>
+<thead><tr><th scope="col">Task / strategy</th><th scope="col">Baseline → strategy success</th><th scope="col">Difference, pp [95% interval]</th><th scope="col" class="n">Holm p</th></tr></thead>
+<tbody>
+<tr><td>Capture, 400 ms / Twin</td><td>47.1% → 71.4%</td><td>+24.3 [+11.4, +37.1]</td><td class="n">.00537</td></tr>
+<tr><td>Capture, GEO / Twin</td><td>25.7% → 64.3%</td><td>+38.6 [+25.7, +51.4]</td><td class="n">5.55 × 10⁻⁶</td></tr>
+<tr><td>Capture, 400 ms / Gain</td><td>47.1% → 2.9%</td><td>−44.3 [−57.1, −32.8]</td><td class="n">1.30 × 10⁻⁸</td></tr>
+<tr><td>Peg, 250 ms / DeadReckon</td><td>10.0% → 87.1%</td><td>+77.1 [+67.1, +85.7]</td><td class="n">1.78 × 10⁻¹⁵</td></tr>
+<tr><td>Peg, 400 ms / Terminal</td><td>1.4% → 100%</td><td>+98.6 [+95.7, +100]</td><td class="n">7.12 × 10⁻²⁰</td></tr>
+</tbody></table></div>
+<p class="note">Intervals are pointwise paired bootstrap intervals; p-values adjust the full family of 21 success comparisons. The recovered GEO outage is included. Shared simulation assumptions and post-selection review still limit generalization. <a href="experiments/second_wave_statistics.md">Full statistical review and reproducible analysis</a>.</p>
+
+<div class="tscroll"><table>
+<thead><tr><th scope="col">Mechanism</th><th scope="col">Defensible conclusion</th><th scope="col">Decisive next test</th></tr></thead>
+<tbody>
+<tr><th scope="row">Twin · H10</th><td>Promising for delayed approach. It also improves the zero-delay controller. The historical analysis does not establish a ≥10% latency-specific throughput gain.</td><td>Matched zero controls and model-mismatch experiments.</td></tr>
+<tr><th scope="row">Terminal · H11</th><td>Strong insertion-proxy assistance. Its ground counterpart also differs in state age, measurement quality and update rate; the comparison does not isolate compute location.</td><td>Match sensing quality and update rate; perturb the pose estimate.</td></tr>
+<tr><th scope="row">DeadReckon · H12</th><td>Promising for delayed insertion within a limited prediction horizon.</td><td>Matched horizon and zero-lead controls on nonlinear command streams.</td></tr>
+<tr><th scope="row">Gain · H14</th><td>Slowing can help static-target insertion and harm capture of a moving object. It is not justified as a universal default.</td><td>Measure the task-specific speed and delay envelope.</td></tr>
+<tr><th scope="row">Chained release · H20</th><td>Reset removal remains useful in principle. Shared episode state, slack-tether damping and endpoint defects limit the historical yield claim.</td><td>Release/counter fixes passed four chains / 20 episodes. Use more independent chains for the original yield claim.</td></tr>
+</tbody></table></div>
+<p>All 20 hypotheses retain their original rejection clauses in the <a href="hypotheses/second_wave_selection.md">second-wave reassessment</a>. A favorable success comparison alone does not satisfy quality, mechanism and safety requirements.</p>
+
+<h2>Count demonstrations, including the failures</h2>
+<pre>Active-task rate = 3,600 × successes / sum(all attempt durations)</pre>
+<p>In the historical Tier-2 400 ms cells, Capture baseline achieved <b>350.9 successful-attempt demos/h</b> but only <b>100.8 successes per attempted hour</b>. Peg baseline achieved 302.5 successful-attempt demos/h but just 1.2 successes per attempted hour. The first metric ignores time spent failing.</p>
+<p>Even the corrected active-task rate excludes campaign setup, file handling, unmodelled resets, operator time and contact availability. Measure QA-accepted demonstrations per active hour, booked hour and calendar day separately. A high relative score against a weak zero-delay baseline also needs an absolute success requirement.</p>
+
+<h2>A mission architecture with open gates</h2>
+<p>Retain the simple command path: one writer per arm, timestamped setpoints, bounded local playout, an independent deterministic supervisor and video compute outside the safety path. Use direct RF passes as the reference architecture. Keep Starlink and Kepler as conditional relay options.</p>
 <ul>
-<li><b>Link.</b> Two Starlink mini-laser terminals as primary; a four-site polar network as fallback and commissioning path; L-band as the safety channel. GEO relay is disqualified by its 474 ms propagation floor.</li>
-<li><b>Protocol.</b> Timestamped, sequence-keyed joint setpoints at 50 Hz, sent twice, played out through a fixed 30 ms buffer. Loss on the relay (1.1 %) is irrelevant to a self-healing setpoint stream; three transport hypotheses abstained after computing exactly that.</li>
-<li><b>Satellite.</b> Decision (c): hold, retract, ramp, static envelopes and hardware cutoffs on a deterministic supervisor. No vision or models in the baseline. The onboard terminal primitive is the one addition the evidence justifies, and it costs a Jetson pose estimator.</li>
-<li><b>Ground.</b> Leader-follower or VR without force feedback, one write authority per arm, the twin view as the default operator display, chained-release task design to remove resets.</li>
-<li><b>Mission.</b> Pressurised ESPA-class bus (Apex Aries class, 100 kg), a 100 to 300 L aluminium cylinder at 1 atm, four Dynamixel-class arms with granular and liquid cells, order of $6 to 12 M including launch. A 16U pass-only variant carries two arms and no relay.</li>
+<li><b>Communications.</b> Obtain client-orbit coverage, terminal resources, directional application delay, burst loss, acquisition behavior and an allocated service. Published optical line rate and commercial announcements do not establish this mission’s usable video bandwidth or continuity.</li>
+<li><b>Availability.</b> The four-site study gives 21.4% geometric visibility at a 5° elevation mask and 14.9% at 10° for its specified orbit and week. These are contact opportunities, not booked operator duty. <a href="experiments/appendix_geometry.md">Geometry appendix</a>.</li>
+<li><b>Spacecraft fit.</b> Apex lists a 125 kg dry base bus and a 100 kg rideshare payload allowance. The former 100 kg bus assumption and associated price sketch do not close a selected mission configuration. <a href="https://www.apexspace.com/platforms/leo-aries">Apex specification</a>.</li>
+<li><b>Enclosure and resources.</b> A 300 L cylinder with length twice its diameter is about 576 × 1,152 mm internally, exceeding the cited 550 mm axis-aligned envelope before walls and mounts. Close packing, stored-energy qualification, radiation, peak/orbit-average power, thermal rejection and arm/base momentum budgets.</li>
+<li><b>Microgravity cooling.</b> Pressure does not restore terrestrial buoyancy cooling. Provide conductive paths or controlled circulation; isolate and record airflow that can disturb the science task.</li>
 </ul>
+<p class="note">Across all 450 recordings, the maximum sampled setpoint rate is 2.0002 rad/s, with no cycles above the 2.1 rad/s tolerance. Actual simulated joint speed reaches <b>6.584 rad/s</b> (Elbow, Capture 12 s outage, seed 1024, simulation time 19.914 s). These are sampled maxima; unrecorded physics steps can peak higher. Command-limit compliance is therefore not a physical velocity bound. A held setpoint can still permit servo motion; cage contact is not proven harmless; a ten-second retract timeout does not validate the path with an object held. Recovery must work locally when all links fail. <a href="experiments/second_wave/record_verification.json">Full recording and motion verification</a>.</p>
+<p><a href="research/second_wave_evidence.md">Primary-source review and mission acceptance gates</a>.</p>
 
-<h2>What the data buys</h2>
-<p>Four tasks expose behaviour no simulator validates and no Earth analog sustains beyond 24 s of free fall: scooping and pouring sieved granular simulant, capturing a truly free 6-DoF tumbling body, capillary pours between vessels, and routing cable and fabric in microgravity. All four are slow by nature, which is the largest latency hider available, and all four fit a 6-DoF arm with a parallel gripper inside a pressurised cell.</p>
-
-<h2>How much to trust this</h2>
-<div class="tscroll"><table>
-<tr><th>Check</th><th>Result</th></tr>
-<tr><td>Test suite on a clean clone</td><td>78 passed</td></tr>
-<tr><td>Independent re-run of two headline cells, 12 seeds each</td><td>48 of 48 per-seed outcomes identical to the Tier 2 vectors</td></tr>
-<tr><td>Adversarial audits before the canonical run</td><td>20 testbed findings and 13 strategy findings; the critical ones (capture keyed on the jaw command, dropout path never exercised, RTT stamped 10 ms late) were fixed and the whole matrix re-run</td></tr>
-<tr><td>Contamination from CPU load</td><td>0 stalled cells in the canonical run (12 in the discarded pre-fix run)</td></tr>
-<tr><td>Zero-latency control cells for Twin and Gain</td><td>Paired difference CI includes zero, so neither strategy gains against the operator model</td></tr>
-</table></div>
-<p><b>What it does not prove.</b> Video is modelled as delay plus bytes, not a codec. The grasp is kinematic once the physical jaw closes on the box. The operator is a synthetic pursuit controller with a 170 ms reaction delay, not a person. Everything runs in real time on one machine. No third-party satellite has published a latency over Starlink lasers, no radiation data exists for the hobby servos, and no policy has been trained on latency-collected demonstrations to see whether it is worse. Those are the flight questions.</p>
+<h2>Make the scientific value testable</h2>
+<p>The opportunity is sustained, repeatable microgravity data. Existing orbital measurements, drop towers and suborbital flights are valid comparators. The current fixed-base SO-100 model, kinematic Capture grasp and constrained Peg task cannot establish granular, fluid, deformable or floating-base fidelity.</p>
+<p>MuJoCo supports elastic contact; the real question is whether calibrated models predict the selected physical task. The proxy’s flight-performance bias can have either sign. <a href="https://mujoco.readthedocs.io/en/stable/modeling.html#restitution">MuJoCo contact documentation</a>.</p>
+<ol>
+<li><b>Choose one repeatable cell.</b> Find a contained task with measurable model error, reliable reset and a target policy. Calibrate against available physical data and test held-out conditions.</li>
+<li><b>Validate the data product.</b> Keep observed and applied actions separate. Record relevant contact/force, base motion and environmental state. Define QA acceptance independently of task success.</li>
+<li><b>Run equal-budget learning comparisons.</b> Compare simulation alone, simulation plus existing physical data, and the same total training budget with additional microgravity demonstrations. Hold policy, optimizer and evaluation budget fixed.</li>
+<li><b>Evaluate physical generalization.</b> Split by object/material, geometry and session; keep correlated chains together. Predeclare a useful improvement and acceptable cost per accepted demonstration.</li>
+</ol>
+<p class="note">These physical and learning experiments are proposed, not completed. The recorder produces research NPZ with improved provenance. It is not a LeRobot-compatible dataset: a pinned-format export and an actual loader/episode-boundary check are still required. No policy-learning gain is claimed.</p>
 
 <h2>Read the full record</h2>
-<p>Repository <code>~/exp/teleoperation</code>, branch <code>main</code>. The report is <code>docs/REPORT.md</code>; the decision record is <code>docs/research/SYNTHESIS.md</code>; results live under <code>docs/experiments/</code> (tier1, tier2, audits, final_verification, geometry, scaling, outage sweep). Reproduce with <code>uv sync</code>, <code>uv run pytest -q</code>, then <code>experiments/matrix.py</code> and <code>experiments/aggregate.py</code>.</p>
-<div class="foot">Eight research agents, one synthesis agent, twenty hypothesis agents, five verifiers, one selection agent, four builders, two auditors, one reviewer, one geometry agent, one verifier, one report writer. Fable 5.1 for research and verification, Opus 5 for implementation. No human in the loop between the brief and this page.</div>
+<p><a href="REPORT.md">Second-wave report</a> · <a href="research/second_wave_evidence.md">Evidence review</a> · <a href="experiments/second_wave_testbed.md">Testbed audit</a> · <a href="experiments/second_wave_statistics.md">Statistical review</a> · <a href="hypotheses/second_wave_selection.md">Hypothesis reassessment</a> · <a href="experiments/second_wave_plan.md">Experiment protocol</a></p>
+<p>The testbed audit reports deterministic endpoint and packet-order checks, protocol/recording regressions and real-socket tests, including a persisted first-episode blackout failure. The independent recording verifier also passed its schema, alignment and outcome checks on all 450 episodes. These checks verify specific corrections and recorded evidence; they do not establish flight safety or learning value.</p>
+<div class="foot">Second-wave senior review with successive Astra research and verification rounds. First-wave evidence remains archived and is not pooled with corrected runs. No launch, hardware qualification, human study or learned-policy evaluation was performed.</div>
 </div>
-
-<script>
-const DATA = {"capture": {"baseline": [[0,0.667,0.488,0.808],[100,0.667,0.488,0.808],[250,0.533,0.361,0.698],[400,0.367,0.219,0.545],[500,0.333,0.192,0.512],[750,0.267,0.142,0.444],[1000,0.167,0.073,0.336]],"deadreckon": [[0,0.7,0.521,0.833],[100,0.733,0.556,0.858],[250,0.533,0.361,0.698],[400,0.4,0.246,0.577],[500,0.4,0.246,0.577],[750,0.233,0.118,0.409],[1000,0.2,0.095,0.373]],"gain": [[0,0.767,0.591,0.882],[100,0.6,0.423,0.754],[250,0.267,0.142,0.444],[400,0.033,0.006,0.167],[500,0.1,0.035,0.256],[750,0,0,0.114],[1000,0,0,0.114]],"terminal": [[0,0.667,0.488,0.808],[100,0.733,0.556,0.858],[250,0.6,0.423,0.754],[400,0.433,0.274,0.608],[500,0.433,0.274,0.608],[750,0.333,0.192,0.512],[1000,0.333,0.192,0.512]],"terminal_ground": [[0,0.633,0.455,0.781],[100,0.7,0.521,0.833],[250,0.533,0.361,0.698],[400,0.3,0.167,0.479],[500,0.333,0.192,0.512],[750,0.133,0.053,0.297],[1000,0.167,0.073,0.336]],"twin": [[0,0.767,0.591,0.882],[100,0.733,0.556,0.858],[250,0.733,0.556,0.858],[400,0.667,0.488,0.808],[500,0.667,0.488,0.808],[750,0.633,0.455,0.781],[1000,0.5,0.332,0.668]]},
-"peg": {"baseline": [[0,0.967,0.833,0.994],[100,0.767,0.591,0.882],[250,0.167,0.073,0.336],[400,0,0,0.114],[500,0,0,0.114],[750,0,0,0.114],[1000,0,0,0.114]],"deadreckon": [[0,1,0.886,1],[100,0.967,0.833,0.994],[250,0.833,0.664,0.927],[400,0,0,0.114],[500,0,0,0.114],[750,0,0,0.114],[1000,0,0,0.114]],"gain": [[0,0.967,0.833,0.994],[100,0.967,0.833,0.994],[250,0.933,0.787,0.982],[400,0.933,0.787,0.982],[500,0.933,0.787,0.982],[750,0.967,0.833,0.994],[1000,0.933,0.787,0.982]],"terminal": [[0,1,0.886,1],[100,1,0.886,1],[250,1,0.886,1],[400,1,0.886,1],[500,1,0.886,1],[750,1,0.886,1],[1000,1,0.886,1]],"terminal_ground": [[0,0.967,0.833,0.994],[100,0,0,0.114],[250,0.033,0.006,0.167],[400,0,0,0.114],[500,0,0,0.114],[750,0,0,0.114],[1000,0,0,0.114]],"twin": [[0,1,0.886,1],[100,1,0.886,1],[250,0.967,0.833,0.994],[400,0.967,0.833,0.994],[500,0.833,0.664,0.927],[750,0,0,0.114],[1000,0,0,0.114]]}};
-const STYLE = {baseline:["var(--ink)",2.4,""],twin:["var(--accent)",2.4,""],terminal:["var(--blue)",2.4,""],terminal_ground:["var(--muted)",1.6,"5 4"],deadreckon:["var(--green)",1.8,""],gain:["var(--violet)",1.8,""]};
-function draw(id, task){
-  const s=document.getElementById(id), W=520,H=320,L=44,R=14,T=14,B=40;
-  const x=v=>L+(W-L-R)*v/1000, y=v=>T+(H-T-B)*(1-v);
-  const ns="http://www.w3.org/2000/svg", el=(n,a,txt)=>{const e=document.createElementNS(ns,n);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;s.appendChild(e);return e};
-  for(const v of [0,.25,.5,.75,1]){el("line",{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:"var(--grid)","stroke-width":1});el("text",{x:L-8,y:y(v)+4,"text-anchor":"end","font-size":11,"font-family":"IBM Plex Mono, monospace",fill:"var(--muted)"},v.toFixed(2))}
-  for(const v of [0,250,500,750,1000]){el("text",{x:x(v),y:H-B+18,"text-anchor":"middle","font-size":11,"font-family":"IBM Plex Mono, monospace",fill:"var(--muted)"},v)}
-  el("text",{x:(L+W-R)/2,y:H-6,"text-anchor":"middle","font-size":11,"font-family":"IBM Plex Mono, monospace",fill:"var(--muted)"},"round-trip time, ms");
-  el("line",{x1:L,x2:L,y1:T,y2:H-B,stroke:"var(--grid)"});
-  const d=DATA[task], base=d.baseline;
-  el("path",{d:base.map((p,i)=>(i?"L":"M")+x(p[0])+" "+y(p[3])).join(" ")+" "+[...base].reverse().map(p=>"L"+x(p[0])+" "+y(p[2])).join(" ")+" Z",fill:"var(--band)",stroke:"none"});
-  const thr=0.8*base[0][1];
-  el("line",{x1:L,x2:W-R,y1:y(thr),y2:y(thr),stroke:"var(--ink2)","stroke-dasharray":"2 4","stroke-width":1});
-  el("line",{x1:x(48),x2:x(48),y1:T,y2:H-B,stroke:"var(--accent)","stroke-dasharray":"4 4","stroke-width":1});
-  el("text",{x:x(48)+5,y:T+12,"font-size":11,"font-family":"IBM Plex Mono, monospace",fill:"var(--accent)"},"relay 48");
-  for(const k of ["terminal_ground","gain","deadreckon","terminal","twin","baseline"]){const [c,w,da]=STYLE[k];
-    el("path",{d:d[k].map((p,i)=>(i?"L":"M")+x(p[0])+" "+y(p[1])).join(" "),fill:"none",stroke:c,"stroke-width":w,"stroke-dasharray":da,"stroke-linejoin":"round"});
-    for(const p of d[k]) el("circle",{cx:x(p[0]),cy:y(p[1]),r:2.6,fill:c});}
-}
-draw("c1","capture"); draw("c2","peg");
-</script>
+</main>
+</body>
+</html>

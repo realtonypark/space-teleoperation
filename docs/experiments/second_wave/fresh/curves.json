@@ -1,0 +1,166 @@
+{
+ "curves": [
+  {
+   "task": "capture",
+   "arm": "baseline [W2]",
+   "strategy": "baseline",
+   "tau_h": 0.17,
+   "block": "W2",
+   "points": [
+    {
+     "rtt_nominal_ms": 0.0,
+     "profile": "zero",
+     "success": 0.7,
+     "ci_lo": 0.5212421254128505,
+     "ci_hi": 0.833352517317562,
+     "demos_per_hour": 429.5454545454545,
+     "n": 30
+    },
+    {
+     "rtt_nominal_ms": 400.0,
+     "profile": "sweep:400",
+     "success": 0.43333333333333335,
+     "ci_lo": 0.27377485576466526,
+     "ci_hi": 0.6080269299918639,
+     "demos_per_hour": 322.9813664596273,
+     "n": 30
+    }
+   ]
+  },
+  {
+   "task": "capture",
+   "arm": "gain",
+   "strategy": "gain",
+   "tau_h": 0.17,
+   "block": "W2",
+   "points": [
+    {
+     "rtt_nominal_ms": 400.0,
+     "profile": "sweep:400",
+     "success": 0.0,
+     "ci_lo": 6.938893903907228e-18,
+     "ci_hi": 0.11351339317396875,
+     "demos_per_hour": 0.0,
+     "n": 30
+    }
+   ]
+  },
+  {
+   "task": "capture",
+   "arm": "twin",
+   "strategy": "twin",
+   "tau_h": 0.17,
+   "block": "W2",
+   "points": [
+    {
+     "rtt_nominal_ms": 0.0,
+     "profile": "zero",
+     "success": 0.8,
+     "ci_lo": 0.6269430358685175,
+     "ci_hi": 0.9049489282271013,
+     "demos_per_hour": 471.8732932823594,
+     "n": 30
+    },
+    {
+     "rtt_nominal_ms": 400.0,
+     "profile": "sweep:400",
+     "success": 0.7,
+     "ci_lo": 0.5212421254128505,
+     "ci_hi": 0.833352517317562,
+     "demos_per_hour": 392.11618257261415,
+     "n": 30
+    }
+   ]
+  },
+  {
+   "task": "peg",
+   "arm": "baseline",
+   "strategy": "baseline",
+   "tau_h": 0.17,
+   "block": "W2",
+   "points": [
+    {
+     "rtt_nominal_ms": 0.0,
+     "profile": "zero",
+     "success": 1.0,
+     "ci_lo": 0.8864866068260312,
+     "ci_hi": 0.9999999999999999,
+     "demos_per_hour": 833.3333333333331,
+     "n": 30
+    },
+    {
+     "rtt_nominal_ms": 250.0,
+     "profile": "sweep:250",
+     "success": 0.0,
+     "ci_lo": 6.938893903907228e-18,
+     "ci_hi": 0.11351339317396875,
+     "demos_per_hour": 0.0,
+     "n": 30
+    },
+    {
+     "rtt_nominal_ms": 400.0,
+     "profile": "sweep:400",
+     "success": 0.0,
+     "ci_lo": 6.938893903907228e-18,
+     "ci_hi": 0.11351339317396875,
+     "demos_per_hour": 0.0,
+     "n": 30
+    }
+   ]
+  },
+  {
+   "task": "peg",
+   "arm": "deadreckon",
+   "strategy": "deadreckon",
+   "tau_h": 0.17,
+   "block": "W2",
+   "points": [
+    {
+     "rtt_nominal_ms": 250.0,
+     "profile": "sweep:250",
+     "success": 0.9,
+     "ci_lo": 0.7437891742081592,
+     "ci_hi": 0.9654001112526657,
+     "demos_per_hour": 629.5336787564768,
+     "n": 30
+    }
+   ]
+  },
+  {
+   "task": "peg",
+   "arm": "terminal",
+   "strategy": "terminal",
+   "tau_h": 0.17,
+   "block": "W2",
+   "points": [
+    {
+     "rtt_nominal_ms": 400.0,
+     "profile": "sweep:400",
+     "success": 1.0,
+     "ci_lo": 0.8864866068260312,
+     "ci_hi": 0.9999999999999999,
+     "demos_per_hour": 634.9206349206352,
+     "n": 30
+    }
+   ]
+  },
+  {
+   "task": "peg",
+   "arm": "terminal_ground",
+   "strategy": "terminal_ground",
+   "tau_h": 0.17,
+   "block": "W2",
+   "points": [
+    {
+     "rtt_nominal_ms": 400.0,
+     "profile": "sweep:400",
+     "success": 0.0,
+     "ci_lo": 6.938893903907228e-18,
+     "ci_hi": 0.11351339317396875,
+     "demos_per_hour": 0.0,
+     "n": 30
+    }
+   ]
+  }
+ ]
+}

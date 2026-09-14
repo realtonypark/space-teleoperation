@@ -1,0 +1,24 @@
+{
+  "recorded_utc": "2026-09-14T02:22:27.232442+00:00",
+  "execution_revision": "550e1908785bab8e9c82470ab16d39a428dcea7d",
+  "source_hash": "22b6d1e5dfc8641c9ed0b74ef0f4ee4950c37de7811059aa0c6e80f0e2b43de0",
+  "external_model": {
+    "repository": "https://github.com/google-deepmind/mujoco_menagerie",
+    "revision": "feadf76d42f8a2162426f7d226a3b539556b3bf5",
+    "path": "trs_so_arm100/so_arm100.xml",
+    "xml_sha256": "01aebd8e66e3a7296947319115c8f354c0cbbc4064a3dec29752f94514ff9604",
+    "worktree_status": ""
+  },
+  "command": "uv run python docs/experiments/second_wave/chain_check.py",
+  "independent_chains": 4,
+  "episodes_per_chain": 5,
+  "starting_seeds": [
+    2000,
+    3000
+  ],
+  "reset_modes": [
+    "free",
+    "teleop"
+  ],
+  "purpose": "Supplemental bookkeeping regression, not an IID H20 effect estimate"
+}

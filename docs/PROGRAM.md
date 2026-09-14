@@ -9,10 +9,14 @@ quality and throughput relative to a zero-latency baseline. We cannot launch, so
 validated architecture plus a runnable testbed that reproduces realistic orbit-link behaviour over
 real sockets and shows the numbers.
 
-Repo `/Users/tpark/exp/teleoperation` is empty (README only). Everything is built from scratch.
+Historical starting state: the repository contained only a README. The first wave built the research program and testbed from scratch.
 Machine: M4 Pro, 24 GB, Python 3.9 system, `uv` available, Herdr available (HERDR_ENV=1).
 
-## Settled decisions (from grilling)
+## Second-wave execution amendment
+
+The original question, autonomous synthetic-operator scope and acceptance targets remain. The user authorized a senior reassessment with Astra agents and a final push to `main`. See [the current report](REPORT.md), [decision record](research/SYNTHESIS.md), and [fresh-study protocol](experiments/second_wave_plan.md). First-wave model assignments below are historical. Separate simulator performance, full safety, hardware readiness and downstream learning evidence; missing evidence is not a PASS.
+
+## Settled first-wave decisions (from grilling)
 
 | Topic | Decision |
 |---|---|

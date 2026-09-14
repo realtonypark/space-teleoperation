@@ -51,5 +51,6 @@
   "cells": 15,
   "episodes": 450,
   "jobs": 4,
-  "command": "uv run python docs/experiments/second_wave/run.py"
+  "command": "uv run python docs/experiments/second_wave/run.py",
+  "execution_revision": "0f68e78319fc0cb15d0e64723a7e50d154fd189b"
 }

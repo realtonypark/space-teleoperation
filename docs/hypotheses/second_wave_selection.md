@@ -5,8 +5,8 @@ the selection amendments, the [charter](../PROGRAM.md), historical experimental 
 the [second-wave evidence review](../research/second_wave_evidence.md),
 [testbed audit](../experiments/second_wave_testbed.md) and
 [statistical review](../experiments/second_wave_statistics.md). This document does not
-report corrected-run outcomes. The [second-wave protocol](../experiments/second_wave_plan.md)
-defines those runs separately. First-wave numbers below describe the old implementation and
+pool corrected-run outcomes with historical evidence. The final addendum below records the
+[second-wave protocol](../experiments/second_wave_plan.md) results separately. First-wave numbers below describe the old implementation and
 remain useful for selecting what to test; they do not validate a changed implementation.
 
 **Keep H10, H11 and H12 as the leading control experiments. Keep H20 as an operations experiment,
@@ -248,7 +248,7 @@ synthetic completion cell. The following priorities reuse the best first-wave wo
 
 | Priority | Research decision | Minimum comparison and decision gate |
 |---|---|---|
-| 1. Trust the collection experiment | Do the main controller effects survive corrected timing, complete outcomes and independent seeds? | Complete the fixed 15-cell/450-attempt [protocol](../experiments/second_wave_plan.md). Preserve code hashes and every attempt; report paired success, all-attempt rate, absolute zero/relay results and exposed safety events. This decides which simulator results remain usable, without claiming to close unrun original gates. |
+| 1. Trust the collection experiment | Do the main controller effects survive corrected timing, complete outcomes and independent seeds? | Completed the fixed 15-cell/450-attempt [protocol](../experiments/second_wave_plan.md). Preserve code hashes and every attempt; report paired success, all-attempt rate, absolute zero/relay results and exposed safety events. This decides which simulator results remain usable, without claiming to close unrun original gates. |
 | 2. Choose one scientifically useful task | Which repeatable low-gravity behavior leaves a consequential error after simulation calibration? | Use existing physical data to fit a baseline model, then evaluate unseen conditions. Select one phenomenon with measurable residual error and feasible containment/reset, before increasing task or arm count. Existing low-gravity granular observations provide a comparator, not proof that this task is already solved or orbit-only: [Ozaki et al.](https://www.nature.com/articles/s41526-023-00308-w). |
 | 3. Choose the least costly collector | Can the selected task be collected through direct passes or a qualified relay without requiring unnecessary onboard autonomy? | First test H10 with model mismatch and its prediction ablations; test H12 on the stationary/contact case. Retain H11 if local assistance adds accepted yield after matched-rate and noisy-pose controls. Keep H14 off for moving capture. Choose using success, recovery, accepted yield and assistance provenance, not knee alone. |
 | 4. Establish operational yield | Does the task repeatedly recover and reset over a booked pass or continuous session? | Replicate H20 by independent chain, add safe pass end and explicit recovery cost, then evaluate H15/H16 only if measured reset time justifies spare arms. Qualify actual goodput, path delay and availability before promoting a relay profile from scenario to service. Direct visibility is not booked operating time; see the [evidence review](../research/second_wave_evidence.md). |
@@ -261,6 +261,30 @@ power/thermal control, pressure containment, component faults and client-orbit s
 gates can invalidate a satellite configuration even if every latency cell passes. Conversely,
 a slower supervisory link may remain useful if repeated physical observations, rather than
 unassisted human imitation, are the data objective. That trade must be explicit.
+
+## Corrected-run addendum
+
+The fixed protocol completed all 450 attempts on new seeds 1000–1029 with no omitted or stalled
+episodes. The [current report, §4](../REPORT.md#4-corrected-experiment-results) gives the complete
+results and uncertainty; the review above retains the original gates and historical provenance.
+
+- H10: Capture at 400 ms improved from 13/30 to 21/30 successes and from 96.5 to 202.8 gross
+  demos/h. Holm-adjusted success p is .0645; the zero-adjusted conditional rate ratio is
+  1.105 [.941, 1.281]. The original ≥10% latency-specific gate remains unconfirmed.
+- H11: Peg at 400 ms improved from 0/30 baseline to 30/30 Terminal; TerminalGround remained
+  0/30. This retains the bundled local-assistance effect, without isolating compute placement.
+- H12: Peg at 250 ms improved from 0/30 to 27/30. The insertion effect survives, while the
+  original Capture and quality clauses remain separate requirements.
+- H14: Gain produced 0/30 Capture successes at 400 ms against 13/30 baseline. Keep the
+  task-dependent interpretation; a static-target benefit does not justify slowing a chase.
+- H20: Post-primary code fixes require completed release, reset per-episode knockaway counters,
+  and preserve retry provenance. The supplemental four-chain/20-episode study tests bookkeeping;
+  it cannot confirm the original throughput claim or treat linked episodes as IID trials.
+
+The baseline relay Capture gross-rate ratio is 72.5%, below the target at the point estimate;
+Peg is 98.3%. The recording audit found actual simulated speed up to 6.584 rad/s despite compliant
+commanded setpoints. Full safety and physical validity remain open. These observations strengthen
+priority 1's completed evidence and make priorities 2–5 necessary rather than optional qualifiers.
 
 ## Implication for our design
 

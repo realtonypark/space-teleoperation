@@ -13,7 +13,10 @@ claims require separate evidence: controllability through delay, viable spacecra
 and useful training data that improve physical performance over available alternatives.
 
 The first wave provides strong exploratory evidence for the first claim on two synthetic tasks.
-Its hardware and data arguments motivate the other two claims. They do not prove them.
+The corrected 450-attempt study retains large insertion gains and a promising Capture Twin effect.
+Baseline relay gross-rate retention is 72.5% for Capture and 98.3% for Peg. Actual simulated joint
+velocity reaches 6.584 rad/s despite compliant setpoints. Hardware readiness, full safety and
+incremental learning value remain separate evidence gates.
 
 ## 2. Architecture choices
 
@@ -67,10 +70,12 @@ not reproduce vacuum regolith. A kinematic grasp and upright peg are useful cont
 unknown bias relative to flight. The fixed-base SO-100 model does not simulate spacecraft recoil
 or attitude-control coupling.
 
-## 5. Next evidence gates
+## 5. Completed and remaining evidence gates
 
-1. Validate corrected outcome timing, complete failure accounting and data provenance, then run
-   the [fixed fresh-seed protocol](../experiments/second_wave_plan.md).
+1. Completed: corrected outcome timing, complete failure accounting and data provenance, plus
+   all 450 attempts in the [fixed fresh-seed protocol](../experiments/second_wave_plan.md).
+   The [recording audit](../experiments/second_wave/record_verification.json) passed all episodes;
+   the report retains model and sampling limits.
 2. Test model and perception mismatch, matched-rate assistance, camera delay/content, and all
    original rejection clauses before accepting a strategy for deployment.
 3. Close a mission-specific mass/power/volume/link/pressure/thermal design; qualify parts and

@@ -1,0 +1,19 @@
+{
+  "recorded_utc": "2026-09-14T02:29:17.095291+00:00",
+  "execution_revision": "be7dd45a300e309defcf2b2e460400e196c20039",
+  "source_hash": "1a28ef41c099bbaa2f05427dbfbbdc1ad44e6a7b3f14f11f2dbc1d30c6628c1e",
+  "external_model": {
+    "repository": "https://github.com/google-deepmind/mujoco_menagerie",
+    "revision": "feadf76d42f8a2162426f7d226a3b539556b3bf5",
+    "path": "trs_so_arm100/so_arm100.xml",
+    "xml_sha256": "01aebd8e66e3a7296947319115c8f354c0cbbc4064a3dec29752f94514ff9604",
+    "worktree_status": ""
+  },
+  "command": "uv run python docs/experiments/second_wave/peg_check.py",
+  "episodes": 30,
+  "seeds": [
+    4000,
+    4009
+  ],
+  "purpose": "Final Peg endpoint predicate regression; not a new mechanism comparison"
+}
