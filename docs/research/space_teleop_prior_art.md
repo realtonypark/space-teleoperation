@@ -1,5 +1,7 @@
 # Space teleoperation prior art
 
+> First-wave research note, retained for traceability. The [second-wave evidence review](second_wave_evidence.md) corrects consequential source claims; the [current synthesis](SYNTHESIS.md) governs decisions.
+
 Scope: every flown program in which a human commanded a robot arm across a space link, plus the two questions at the end (arms inside free-flyers; leader-follower / VR data collection in orbit). Figures carry a source or `[unverified]`. Direction matters: most ISS "telerobotics" experiments put the **operator in orbit and the robot on Earth**. Only the rows marked **G→O** are ground operator → orbital robot, which is our case.
 
 ## 1. Program table

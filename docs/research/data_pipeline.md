@@ -1,5 +1,7 @@
 # Data pipeline for teleop demonstrations
 
+> First-wave research note, retained for traceability. The [second-wave evidence review](second_wave_evidence.md) corrects consequential source claims; the [current synthesis](SYNTHESIS.md) governs decisions.
+
 Scope: (1) LeRobot dataset format v2.1/v3.0 and how ALOHA/SO-100 data is recorded, (2) what makes a teleop demonstration useful for policy learning, with the latency/jitter evidence that exists, (3) the metrics and minimal schema our recorder must emit.
 
 ## 1. LeRobot dataset format

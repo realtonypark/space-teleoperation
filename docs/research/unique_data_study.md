@@ -1,5 +1,7 @@
 # What orbit-only manipulation data is worth collecting
 
+> First-wave research note, retained for traceability. The [second-wave evidence review](second_wave_evidence.md) corrects consequential source claims; the [current synthesis](SYNTHESIS.md) governs decisions.
+
 Question: which manipulation phenomena cannot be produced reliably in Earth simulators or Earth labs, so that teleoperated robot-arm demonstrations in LEO carry unique value for physical-AI training?
 
 Method: primary sources (ISS experiment papers, ESA/NASA reports, simulator docs, sim-to-real studies). Ranking is by "residual gap": what remains unavailable after the best simulator and the best Earth analog are both used. Numbers without a source are marked `[unverified]`.

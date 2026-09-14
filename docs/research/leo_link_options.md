@@ -1,5 +1,7 @@
 # LEO satellite-to-ground link options for continuous low-latency teleop (buyable in 2026)
 
+> First-wave research note, retained for traceability. The [second-wave evidence review](second_wave_evidence.md) corrects consequential source claims; the [current synthesis](SYNTHESIS.md) governs decisions.
+
 Scope: a small payload in a ~550 km orbit, 4 operators, each needing a live video downlink and a command uplink, target RTT < 150 ms, continuous coverage. Numbers marked `[computed]` come from a 30-day circular-orbit simulation run for this document (stdlib Python: Keplerian motion + J2 nodal precession at sun-synchronous inclination, Earth rotation, 5 s steps; not committed). `[secondary]` = trade press or vendor comparison site, not a primary source. `[unverified]` = no source found.
 
 ## 1. Physics floor and where the rest of the latency comes from

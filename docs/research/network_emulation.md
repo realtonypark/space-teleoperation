@@ -1,5 +1,7 @@
 # Network emulation and measurement for the LEO teleop testbed
 
+> First-wave research note, retained for traceability. The [second-wave evidence review](second_wave_evidence.md) corrects consequential source claims; the [current synthesis](SYNTHESIS.md) governs decisions.
+
 Scope: (1) what public measurements say about Starlink-class LEO links, LEO-relay paths, GEO relay (TDRSS) and direct ground-station (GS) passes; (2) how to build a faithful UDP link emulator in Python on macOS; (3) TLE-based contact windows for a 550 km SSO satellite; (4) four concrete link profiles ready to implement. Numbers without a citation are marked `[unverified]` or `[own computation]` (scripts and command output are reproduced below).
 
 ## 1. Measured link behaviour

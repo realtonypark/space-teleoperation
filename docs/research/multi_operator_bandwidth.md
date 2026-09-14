@@ -1,5 +1,7 @@
 # Multi-operator teleop bandwidth and latency budgets
 
+> First-wave research note, retained for traceability. The [second-wave evidence review](second_wave_evidence.md) corrects consequential source claims; the [current synthesis](SYNTHESIS.md) governs decisions.
+
 Scope: video downlink budget, command uplink budget, scaling to 4 and 8 concurrent operators, and how existing space/ground programs isolate and schedule sessions over intermittent links. Numbers are measured values from the cited sources unless marked `[computed]` (arithmetic from cited inputs) or `[assumption]` (design choice, stated).
 
 ## 1. Video: glass-to-glass (G2G) latency

@@ -1,5 +1,7 @@
 # Hardware landscape: rideshare small satellite carrying 4–8 teleoperated arms (buyable 2026)
 
+> First-wave research note, retained for traceability. The [second-wave evidence review](second_wave_evidence.md) corrects consequential source claims; the [current synthesis](SYNTHESIS.md) governs decisions.
+
 Scope: what can be bought in 2026 for a rideshare-launched satellite with 4–8 simple robot arms inside an enclosed volume, continuous video down, low-rate command up. Numbers carry a source or `[unverified]`; arithmetic I did myself is marked `[derived]`. Research date: 2026-09-12.
 
 ## 1. Bus class

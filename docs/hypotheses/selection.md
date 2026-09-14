@@ -1,5 +1,7 @@
 # Selection: which hypotheses go head to head against the baseline
 
+> Historical first-wave selection. See the [second-wave reassessment](second_wave_selection.md) for current status against each original rejection rule.
+
 Inputs: PROGRAM.md, SYNTHESIS.md, TESTBED_SPEC.md, H01–H20, scores_V1–V5, and the **working tree** at
 selection time (uncommitted diffs in 11 files). The working tree, not `71fbc13`, is the baseline every
 verdict below is measured against, because it already contains most of what the verifiers said was

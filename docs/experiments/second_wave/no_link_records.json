@@ -1,0 +1,30 @@
+[
+  {
+    "cell": "T2_capture_baseline_geo_relay_tau0.17",
+    "seed": 69,
+    "duration_s": 30.0,
+    "stdout_sha256": "f9c84c6843cef25339951e8854e3c80c1a1d623dec6235cc2441c00f5db0fab1",
+    "stdout_line": "arm 0 ep 69 seed 69 success=False NO_LINK 30.0s"
+  },
+  {
+    "cell": "T2_capture_twin_geo_relay_tau0.17",
+    "seed": 69,
+    "duration_s": 30.0,
+    "stdout_sha256": "5b0c16d7289118fcf0d1c2fda54057fbfc5499e668c8ff56388b385e31fb6e3f",
+    "stdout_line": "arm 0 ep 69 seed 69 success=False NO_LINK 30.0s"
+  },
+  {
+    "cell": "T2_peg_baseline_geo_relay_tau0.17",
+    "seed": 69,
+    "duration_s": 30.0,
+    "stdout_sha256": "e668e3cf10143ca1ea19d29bde654f79c3a9c112ac672c0163757e8af4e9a517",
+    "stdout_line": "arm 0 ep 69 seed 69 success=False NO_LINK 30.0s"
+  },
+  {
+    "cell": "T2_peg_gain_geo_relay_tau0.17",
+    "seed": 69,
+    "duration_s": 30.0,
+    "stdout_sha256": "a11fb9bd56e362e664ba6314777bc62e22106eae6994409b2a56ea8f95409ffa",
+    "stdout_line": "arm 0 ep 69 seed 69 success=False NO_LINK 30.0s"
+  }
+]

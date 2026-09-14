@@ -1,5 +1,7 @@
 # Teleoperation fundamentals for latency
 
+> First-wave research note, retained for traceability. The [second-wave evidence review](second_wave_evidence.md) corrects consequential source claims; the [current synthesis](SYNTHESIS.md) governs decisions.
+
 Scope: what measured human performance does as round-trip time (RTT) and jitter grow, per manipulation task class; which latency-hiding methods have quantified evidence; and what a ground teleop stack's latency budget actually looks like. Numbers carry a source or `[unverified]`. "Secondary" marks a figure taken from a survey or citing paper rather than the original.
 
 ## 1. Human performance versus RTT and jitter
