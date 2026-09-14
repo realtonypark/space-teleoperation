@@ -64,3 +64,17 @@ Prefer measured simulator evidence and explicit mission gates to a stronger feas
 than this testbed can support. Hardware qualification, human usability and downstream policy
 learning remain separate empirical questions; the second wave must supply a concrete path to
 answer them without pretending that local simulation answers them already.
+
+## Supplemental regression study (added after independent code review)
+
+The independent review found chain-only completion/counter defects and retry metadata mixing.
+After the frozen 450-episode study finishes, apply these fixes and use two starting seeds (2000,
+3000), both reset modes (`free`, `teleop`), five episodes per chain, on `leo_relay`: four chains,
+20 episodes total, at most two concurrent processes. Capture keeps its 20 s deadline; timely
+capture permits the existing total 28 s chain deadline. Record the second executable revision.
+
+This study checks release-complete outcomes, per-episode counters, metadata consistency and reset
+accounting. It is not powered to confirm H20's throughput or success-retention claims. Do not treat
+the 20 linked episodes as independent replicates or pool them with the primary protocol. Also test
+an intentionally unfinished release under a fake clock and retry the same output metadata in a
+small regression test. These deterministic checks provide the evidence for those failure paths.

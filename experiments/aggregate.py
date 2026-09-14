@@ -24,7 +24,7 @@ T05 smoothness is recomputed from the satellite applied-setpoint sidecar when th
 T06 stalled episodes are counted per cell and flagged; --exclude-stalled drops them
     (paired: the seed goes from every arm of that task/profile/tau group).
 T07 link_unsafe (move_in_hold + vel_over + keepout) and cage are separate columns; the
-    section 6 gate is on link_unsafe, cage is reported as operator/task-caused.
+    historical narrow screen uses link_unsafe; original strict safety also includes cage.
 T09/F2 the 1.0 s satellite linger is subtracted from every duration unless the summary
     says it was already excluded.
 T10 direct_gs throughput is also reported per 9.2-minute pass.
@@ -49,8 +49,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from spaceteleop.metrics import STALL, ldlj                            # noqa: E402
 
-LINK_SAFE = ("move_in_hold", "vel_over", "keepout")     # link-caused, the section 6 gate
-SAFE = LINK_SAFE + ("cage",)                            # cage is operator/task-caused (T07)
+LINK_SAFE = ("move_in_hold", "vel_over", "keepout")     # historical narrow counter sum
+SAFE = LINK_SAFE + ("cage",)                            # original safety criterion includes cage
 DIAG = SAFE + ("hold", "ramp_clip", "pos_clamp", "retract", "jams", "stale")
 NAMED = ("zero", "direct_gs", "leo_relay", "geo_relay")     # section 6 acceptance set
 PRIMARY_TAU = 0.17
@@ -333,9 +333,21 @@ def _arm(k):
 
 
 def _f(v, p=2):
-    if v is None:
+    if v is None or isinstance(v, float) and not math.isfinite(v):
         return "-"
     return f"{v:.{p}f}" if isinstance(v, (int, float)) and not isinstance(v, bool) else str(v)
+
+
+
+def json_safe(value):
+    """Represent unavailable numeric output as JSON null, preserving real zeros."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {k: json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe(v) for v in value]
+    return value
 
 
 def extras(cs):
@@ -482,8 +494,8 @@ def _block_s(cs, legacy_dr=False):
     if not rows:
         return []
     doc = ["## Block S: forced dropout (leo_relay_drop1 / leo_relay_drop12)", "",
-           "Hold and retract are the counts the run reports; `link_unsafe` is the section 6 "
-           "link-caused sum, which is what the dropout block exists to exercise (T02).", "",
+           "Hold and retract are the counts the run reports; `link_unsafe` is the "
+           "historical narrow counter sum. Cage is also required by the original safety gate.", "",
            "| task | arm | profile | hold | retract | link_unsafe | cage | success |",
            "|---|---|---|---|---|---|---|---|"]
     for c in sorted(rows, key=lambda c: (c["task"], c["strategy"], c["profile"])):
@@ -522,9 +534,9 @@ def results_md(cs, kn, acc, baseline, legacy_dr=False, excluded=False):
                         if c["profile"] == "direct_gs" else "")),
             ("RTT p50 / p95, ms",
              lambda c: f"{_f(_g(c, 'rtt_p50_ms'), 0)} / {_f(_g(c, 'rtt_p95_ms'), 0)}"),
-            ("link_unsafe = move_in_hold + vel_over + keepout (the section 6 gate)",
+            ("link_unsafe = move_in_hold + vel_over + keepout (historical narrow sum)",
              lambda c: f"{c['link_unsafe']}"),
-            ("cage contacts (operator/task-caused, reported not gated)",
+            ("cage contacts (included in strict safety)",
              lambda c: f"{c['cage']}"),
             ("SAL / LDLJ / stall_frac (source: sat = applied-setpoint sidecar, obs = "
              "observation.state)",
@@ -571,13 +583,13 @@ def results_md(cs, kn, acc, baseline, legacy_dr=False, excluded=False):
             "|---|---|---|---|---|---|---|---|"]
     for (task, k), v in sorted(acc.items()):
         doc.append(f"| {task} | {_arm(k)} | "
-                   f"{v['success_frac']:.2f} | {v['dph_frac']:.2f} | "
+                   f"{_f(v['success_frac'])} | {_f(v['dph_frac'])} | "
                    f"{v['link_unsafe_named']} ({'+'.join(v['profiles_present'])}) | "
                    f"{v['cage_named']} | {v['status']} | {v['strict_safety_status']} |")
     if not acc:
         doc.append("| (no arm has both a `zero` and a `leo_relay` cell yet) |")
     doc += ["", "Historical amended screen: both fractions >= 0.80 and "
-            "zero **link-caused** unsafe events, with all four named profiles and their safety counters present. "
+            "zero events in the **historical narrow counter sum**, with all four named profiles and their safety counters present. "
             "The original SYNTHESIS section 6 also gates cage contacts; strict safety includes those. "
             "ZERO_OBSERVED means zero measured events, not a safety certification. "
             "This is a point-estimate screen, not an uncertainty-qualified acceptance claim. "
@@ -624,11 +636,11 @@ def paired_md(rows, baseline, legacy_dr=False):
             "demos/h ratio [95 % CI] | drop |",
             "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
-        ci = f"[{r['dph_ci'][0]:.2f}, {r['dph_ci'][1]:.2f}]"
+        ci = f"[{_f(r['dph_ci'][0])}, {_f(r['dph_ci'][1])}]"
         doc.append(f"| {r['task']} | {r['profile']} | {r['tau_h']} | {r['arm']} | {r['n']} | "
                    f"{r['base_success']:.2f} | {r['arm_success']:.2f} | {r['diff']:+.2f} | "
                    f"{r['b_only']} | {r['c_only']} | {r['mcnemar_p']:.4f} | "
-                   f"{r['dph_ratio']:.2f} {ci} | {r['dropped_resamples']} |")
+                   f"{_f(r['dph_ratio'])} {ci} | {r['dropped_resamples']} |")
     if not rows:
         doc.append("| (no non-baseline arm has a paired baseline cell yet) |")
     doc += ["", "## Failure-inclusive throughput and multiplicity", "",
@@ -654,7 +666,7 @@ def paired_md(rows, baseline, legacy_dr=False):
         flag = "⚠ gain at zero latency" if gain else "no detected gain; equivalence untested"
         doc.append(f"| {r['task']} | {r['arm']} | {r['n']} | "
                    f"{r['diff']:+.2f} [{r['diff_ci'][0]:+.2f}, {r['diff_ci'][1]:+.2f}] | "
-                   f"{r['dph_ratio']:.3f} [{r['dph_ci'][0]:.3f}, {r['dph_ci'][1]:.3f}] | "
+                   f"{_f(r['dph_ratio'], 3)} [{_f(r['dph_ci'][0], 3)}, {_f(r['dph_ci'][1], 3)}] | "
                    f"{r['dropped_resamples']} | {flag} |")
     if not zero:
         doc.append("| (no arm has a paired `zero` cell yet) |")
@@ -685,15 +697,16 @@ def main(argv=None):
     open(f"{a.out}/results.md", "w").write(
         results_md(cs, kn, acc, a.baseline, dr, a.exclude_stalled) + "\n")
     open(f"{a.out}/paired.md", "w").write(paired_md(pr, a.baseline, dr))
-    json.dump({"curves": cv}, open(f"{a.out}/curves.json", "w"), indent=1)
-    json.dump({"cells": [{k: v for k, v in c.items() if k not in ("cmd", "dir")}
+    json.dump(json_safe({"curves": cv}), open(f"{a.out}/curves.json", "w"),
+              indent=1, allow_nan=False)
+    json.dump(json_safe({"cells": [{k: v for k, v in c.items() if k not in ("cmd", "dir")}
                          for c in cs],
                "paired": pr,
                "knee": [{"task": t, "strategy": k[0], "tau_h": k[1], "block": k[2], **v}
                         for (t, k), v in sorted(kn.items())],
                "acceptance": [{"task": t, "strategy": k[0], "tau_h": k[1], "block": k[2],
-                               **v} for (t, k), v in sorted(acc.items())]},
-              open(f"{a.out}/results.json", "w"), indent=1)
+                               **v} for (t, k), v in sorted(acc.items())]}),
+              open(f"{a.out}/results.json", "w"), indent=1, allow_nan=False)
     print(f"{len(cs)} cells -> {a.out}/results.md, results.json, paired.md, curves.json "
           f"({len(pr)} paired comparisons, "
           f"{sum(c['contaminated'] for c in cs)} contaminated cells)")

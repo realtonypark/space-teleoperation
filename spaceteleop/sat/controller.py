@@ -30,6 +30,7 @@ from ..proto import (F_ASSIST, F_DONE, F_GRASPED, F_SAFETY_HOLD, F_SUCCESS, pack
 BUFLEN = 64
 # H20: a chained episode does not end at success but at the teleoperated re-release that
 # seeds the next one, so the max_s guillotine has to allow for the reset segment.
+# This extends the TOTAL episode cap after capture, not a timer from capture.
 RESET_MAX = 8.0
 # One telemetry frame is one datagram, and macOS caps a UDP datagram at 9216 bytes
 # (net.inet.udp.maxdgram, root-only). 8 kB/frame at 30 Hz models a ~2 Mb/s video budget,
@@ -52,7 +53,7 @@ def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.
         st = sim.reset(m, d, seed, task, reset_mode)
     else:                              # chained: new demonstration, same scene and box
         st.update(success=False, done=False, t_success=None, in_region_since=None,
-                  keepout=0, cage_hits=0, jams=0, t_out=None, t_hit=None)
+                  keepout=0, cage_hits=0, jams=0, knockaway=0, t_out=None, t_hit=None, t_knock=None)
     strategy.sat = (m, d, st)          # H11: the primitive needs the satellite's own state
     home = list(d.ctrl[:sim.NJ]) + [0.0]
     strategy.last, strategy.reset_pose = list(home), list(home)
@@ -144,7 +145,9 @@ def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.
     # ground has stopped sending and every cycle logs a hold (audit F12). Keeping it would
     # put ~0.7 s of frozen setpoints into the smoothness and stall numbers (T05) and into
     # the assist denominator (F7).
-    return dict(success=st["success"], duration=min(d.time - sim_t0, max_s), cmds_rx=ncmd,
+    # Capture is a milestone; a reusable chain demonstration also needs release.
+    won = st["success"] and (task != "capture_chain" or st["done"])
+    return dict(success=won, duration=min(d.time - sim_t0, budget), cmds_rx=ncmd,
                 last_seq=last_seq, hold_time=hold_time, hold_steps=holds,
                 reordered=reordered, satlog=satlog[:done_i], st=st, success_wall=success_at,
                 done_wall=done_at,

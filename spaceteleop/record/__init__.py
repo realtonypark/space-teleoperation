@@ -52,16 +52,16 @@ CHUNK = 1000            # LeRobot `chunks_size`: episodes per data/chunk-%03d di
 JOINTS = ["Rotation", "Pitch", "Elbow", "Wrist_Pitch", "Wrist_Roll", "Jaw", "spare"]
 
 
-def _task_index(out_dir, task):
+def _task_index(out_dir, task, reset=False):
     """meta/tasks.jsonl, LeRobot v2.x: one {task_index, task} line per distinct task."""
     p = f"{out_dir}/meta/tasks.jsonl"
     tasks = []
-    if os.path.exists(p):
+    if os.path.exists(p) and not reset:
         with open(p) as f:
             tasks = [json.loads(l)["task"] for l in f if l.strip()]
     if task not in tasks:
         tasks.append(task)
-        with open(p, "a") as f:
+        with open(p, "w" if reset else "a") as f:
             f.write(json.dumps({"task_index": len(tasks) - 1, "task": task}) + "\n")
     return tasks.index(task), len(tasks)
 
@@ -71,14 +71,16 @@ def write_sat(out_dir, ep_index, satlog):
 
     `assist` is proto.F_ASSIST per control cycle (H11): the mask a training run needs to
     tell a robot-executed segment from a human-executed one. `taut` is H20's tether."""
+    path = f"{out_dir}/data/episode_{ep_index:06d}_sat.npz"
     if not satlog:
+        if os.path.exists(path):
+            os.remove(path)  # a rewritten episode must not inherit its old sidecar
         return None
     col = lambda i, t: np.array([r[i] if len(r) > i else 0 for r in satlog], t)
     actual = ({k: col(i, dtype) for i, k, dtype in (
         (7, "sim_time", np.float64), (8, "state", np.float32),
         (9, "velocity", np.float32), (10, "object", np.float32),
         (11, "grasped", bool), (12, "success", bool))} if len(satlog[0]) > 12 else {})
-    path = f"{out_dir}/data/episode_{ep_index:06d}_sat.npz"
     np.savez_compressed(
         path, t_ns=np.array([r[0] for r in satlog], np.int64),
         t_applied_ns=np.array([r[1] for r in satlog], np.int64),
@@ -91,11 +93,24 @@ def write_sat(out_dir, ep_index, satlog):
 
 def write_episode(out_dir, ep_index, rows, task="capture", index0=0, satlog=(),
                   fps=FPS, outcome=None):
-    """rows: list of dicts with the COLS keys (minus index/episode_index). -> npz path."""
+    """Write a sequential episode; retrying an index replaces the metadata suffix.
+
+    Episode 0 starts fresh metadata. Old suffix files are retained but unindexed;
+    only this episode and its sidecar are replaced. `index0` must match the prefix.
+    """
     os.makedirs(f"{out_dir}/data", exist_ok=True)
     os.makedirs(f"{out_dir}/meta", exist_ok=True)
+    meta = f"{out_dir}/meta/episodes.jsonl"
+    previous = {}
+    if ep_index and os.path.exists(meta):
+        with open(meta) as f:
+            entries = (json.loads(line) for line in f if line.strip())
+            previous = {e["episode_index"]: e for e in entries if e["episode_index"] < ep_index}
+    if (sorted(previous) != list(range(ep_index)) or ep_index < 0
+            or index0 != sum(e["length"] for e in previous.values())):
+        raise ValueError("episode index and index0 must follow the recorded prefix")
     n = len(rows)
-    ti, ntasks = _task_index(out_dir, task)
+    ti, ntasks = _task_index(out_dir, task, reset=ep_index == 0)
     arr = {
         "observation.state": np.array([r["observation.state"] for r in rows], np.float32).reshape(n, 7),
         "action": np.array([r["action"] for r in rows], np.float32).reshape(n, 7),
@@ -123,9 +138,11 @@ def write_episode(out_dir, ep_index, rows, task="capture", index0=0, satlog=(),
     path = f"{out_dir}/data/episode_{ep_index:06d}.npz"
     np.savez_compressed(path, **arr)
     write_sat(out_dir, ep_index, satlog)
-    with open(f"{out_dir}/meta/episodes.jsonl", "a") as f:
-        f.write(json.dumps({"episode_index": ep_index, "tasks": [task], "length": n,
-                            **({"outcome": outcome} if outcome is not None else {})}) + "\n")
+    previous[ep_index] = {"episode_index": ep_index, "tasks": [task], "length": n,
+                          **({"outcome": outcome} if outcome is not None else {})}
+    with open(meta, "w") as f:
+        for index in sorted(previous):
+            f.write(json.dumps(previous[index]) + "\n")
     neps = ep_index + 1
     json.dump({"codebase_version": "v2.1", "recording_schema": 2,
                "robot_type": "so_arm100", "fps": fps,

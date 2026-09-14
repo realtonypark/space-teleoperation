@@ -3,9 +3,9 @@
 SYNTHESIS section 5 excludes every subgoal primitive and all vision from the baseline, so
 nothing in this file is allowed to fly under decision (c). It is the measured value of
 buying the exclusion back: `Terminal` runs the primitive on the satellite from the true
-state (ground-truth pose, therefore an UPPER BOUND on what an onboard estimator could do),
+state (an optimistic oracle condition, not a proved performance bound),
 `TerminalGround` runs the identical primitive on the ground from telemetry the link has
-already aged, and P - Pg is what the onboard compute is worth.
+already aged. P - Pg combines placement, update rate, state age and sensing quality.
 
 The operator still produces every approach and every carry. Delegated is only the segment
 latency destroys: the last <= 8 cm of a capture, or the last few mm of an insertion, both
@@ -16,7 +16,7 @@ holds, replaces the target with one damped-least-squares step from the TRUE `d.q
 toward the object at <= 0.07 m/s. Either way the emitted setpoint goes through the
 inherited baseline tail (hold, retract, ramp limit, joint clamp), which is why the section
 6 envelopes still hold over the primitive's output and why `move_in_hold`, `ramp_clip`,
-`pos_clamp` and `vel_over` keep counting the stream the arm actually saw.
+`pos_clamp` and `vel_over` keep counting the applied setpoint stream; actual joint motion is recorded separately.
 
 The hand-back is the whole risk (H11 risk 3). While the primitive drives, the operator's
 internal `qc` stays where it was, so its first post-primitive setpoint is several cm from
@@ -42,9 +42,8 @@ from ..proto import F_GRASPED, F_SAFETY_HOLD, F_SUCCESS
 from .baseline import Baseline
 
 # ponytail: the primitive reads the simulator's exact object pose, so every number here is
-# the UPPER BOUND of H11, never the flight value. The lower bound needs the noise cell the
-# hypothesis asks for (5 mm position noise + 33 ms lag on `obj`), which is ~3 lines in
-# `_run` plus a flag; add it when the upper bound turns out to be worth having.
+# an oracle condition, not flight performance. Add the hypothesis's 5 mm pose noise
+# and 33 ms sensing lag when evaluating estimator robustness.
 REACH = 0.08        # m, capture trigger radius [design choice, H11]
 MAX_S = 2.0         # s, hard bound on one primitive engagement [design choice, H11]
 V = 0.07            # m/s, Cartesian speed of the primitive (H11 "<= 7 cm/s")
@@ -54,7 +53,7 @@ BLEND_S = 0.5       # s, hand-back crossfade back onto the operator's stream
 class _Prim(Baseline):
     """The primitive itself. `Terminal` runs it in `sat_step`, `TerminalGround` in
     `ground_step`; everything below is state-source agnostic on purpose, so the ablation
-    measures the state it sees and nothing else."""
+    also differs in invocation rate and state age; it does not isolate placement."""
 
     sat = None      # (m, d, st), set by sat/controller.py after sim.reset
     m = None        # model, passed by run.py for the ground ablation

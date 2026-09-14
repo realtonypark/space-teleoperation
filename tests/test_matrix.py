@@ -100,11 +100,18 @@ def test_parse_stdout():
 
 
 def test_blackout_episode_is_retained_and_failed_run_exits(monkeypatch):
-    eps, _ = matrix.parse_stdout(
-        "arm 0 ep 0 seed 1000 success=False 30.0s rtt_p50=nanms hold=0.00s "
-        "unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=0 no_link=True\n")
-    assert len(eps) == 1 and eps[0]["no_link"] and not eps[0]["success"]
-    assert matrix.complete(eps, 1, 1000)
+    for suffix, no_link in (("no_link=True", True),
+                            ("reset=0.2s innov=0.1mm no_link=True", True),
+                            ("no_link=False reset=0.2s innov=0.1mm", False),
+                            ("reset=0.2s innov=0.1mm", False)):
+        eps, agg = matrix.parse_stdout(
+            "arm 0 ep 0 seed 1000 success=False 30.0s rtt_p50=nanms hold=0.00s "
+            f"unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=0 {suffix}\n"
+            "demos_per_h_gross 1800.0\n")
+        assert len(eps) == 1 and eps[0]["no_link"] is no_link and not eps[0]["success"]
+        assert matrix.complete(eps, 1, 1000)
+        assert agg["demos_per_hour_gross"] == 1800.0
+        assert "demos_per_h_gross" not in agg
     monkeypatch.setattr(matrix, "run", lambda *args: 1)
     with pytest.raises(SystemExit, match="1"):
         matrix.main(["--blocks", "A", "--profiles", "zero", "--seeds", "1"])
@@ -386,3 +393,44 @@ def test_knee_interpolation(tmp_path):
     knee = json.loads((out / "results.json").read_text())["knee"][0]
     assert knee["threshold"] == pytest.approx(0.8)
     assert knee["knee_ms"] == pytest.approx(287.5)
+
+
+def test_run_cell_archives_retry_uses_absolute_output_and_checks_completeness(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    monkeypatch.chdir(tmp_path)
+    cell = matrix.Cell("A", "capture", "baseline", "zero", 0.17, 2, 0.05)
+    root = Path("relative_raw")
+    directory = (tmp_path / root / cell.name).resolve()
+    (directory / "data").mkdir(parents=True)
+    (directory / "data/original.npz").write_bytes(b"previous evidence")
+    stamps = iter([100, 200])
+    monkeypatch.setattr(matrix.time, "time_ns", lambda: next(stamps))
+    monkeypatch.setattr(matrix, "source_hash", lambda: "fixed-source")
+    rows = [f"arm 0 ep {i} seed {100+i} success=False 0.1s rtt_p50=nanms "
+            "hold=0.00s unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=0 "
+            "reset=0.0s no_link=True\n" for i in range(2)]
+    outputs = iter(["".join(rows), rows[0]])
+    calls = []
+
+    def run(cmd, **kwargs):
+        calls.append(cmd)
+        assert Path(cmd[cmd.index("--out") + 1]) == directory
+        assert Path(cmd[cmd.index("--out") + 1]).is_absolute()
+        assert Path(kwargs["cwd"]) == Path(matrix.__file__).resolve().parents[1]
+        assert list(directory.iterdir()) == [], "each attempt must start in a fresh directory"
+        return SimpleNamespace(stdout=next(outputs), stderr="", returncode=0)
+
+    monkeypatch.setattr(matrix.subprocess, "run", run)
+    first = matrix.run_cell(cell, root, seed0=100)
+    assert first["error"] is None and matrix.done(cell, root, seed0=100)
+    assert [e["seed"] for e in first["episodes"]] == [100, 101]
+    assert all(e["no_link"] for e in first["episodes"])
+    archive = tmp_path / root / "_superseded"
+    assert (archive / f"{cell.name}-100/data/original.npz").read_bytes() == b"previous evidence"
+    second = matrix.run_cell(cell, root, seed0=100)
+    assert second["error"] == "incomplete or mismatched episode seed vector"
+    assert not matrix.done(cell, root, seed0=100)
+    assert json.loads((archive / f"{cell.name}-200/summary.json").read_text())["error"] is None
+    assert len(list(archive.iterdir())) == 2 and len(calls) == 2
+    assert json.loads((directory / "summary.json").read_text())["error"] == second["error"]

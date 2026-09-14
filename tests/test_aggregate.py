@@ -75,3 +75,46 @@ def test_knee_reports_sampled_bracket_and_skips_zero_success_reference():
     cs[-1] = cell(profile="sweep:250")
     cs[-1]["rtt_ms"] = 250
     assert a.knee(cs, [key])[key]["status"] == "not_observed"
+
+
+def test_outputs_are_strict_json_with_nulls_and_real_zeros(tmp_path):
+    import json
+    from docs.experiments.second_wave import analyze
+
+    raw, out = tmp_path / 'raw', tmp_path / 'out'
+    for strategy in ('baseline', 'twin'):
+        for profile in ('zero', 'leo_relay', 'sweep:400'):
+            c = cell(strategy, profile, success=(0, 0))
+            c['name'] = f'{strategy}_{profile}'
+            c['aggregate'].update(sal=float('nan'), rtt_p50_ms=float('inf'))
+            path = raw / c['name']
+            path.mkdir(parents=True)
+            (path / 'summary.json').write_text(json.dumps(c))
+    a.main(['--raw', str(raw), '--out', str(out)])
+
+    def reject_constant(value):
+        raise AssertionError(f'Non-JSON constant: {value}')
+
+    results = json.loads((out / 'results.json').read_text(), parse_constant=reject_constant)
+    curves = json.loads((out / 'curves.json').read_text(), parse_constant=reject_constant)
+    assert results['cells'][0]['aggregate']['sal'] is None
+    assert results['cells'][0]['aggregate']['rtt_p50_ms'] is None
+    assert results['paired'][0]['dph_ratio'] is None
+    assert results['paired'][0]['dph_ci'] == [None, None]
+    assert results['paired'][0]['gross_dph_diff'] == 0
+    assert results['acceptance'][0]['success_frac'] is None
+    assert curves['curves'][0]['points'][0]['success'] == 0
+    assert '- [-, -]' in (out / 'paired.md').read_text()
+    assert 'nan' not in (out / 'results.md').read_text()
+    assert a._f(None) == a._f(float('inf')) == a._f(float('nan')) == '-'
+    assert a.json_safe((0, float('-inf'))) == [0, None]
+
+    # Fresh-result processing reconstructs vectors; JSON nulls remain valid input.
+    cs = analyze.select(results['cells'], 0)
+    assert analyze.joint_rows(cs)[0]['conditional_rr_ci'] == [None, None]
+    assert analyze.acceptance_rows(cs)[0]['gross_dph_frac'] is None
+    zero = next(c for c in cs if c['strategy'] == 'baseline' and c['profile'] == 'zero')
+    for e in zero['episodes']:
+        e['seed'] += 10
+    a._vectors(zero)
+    assert analyze.joint_rows(cs) == []

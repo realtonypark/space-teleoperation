@@ -118,7 +118,7 @@ def run_arm(m, args, arm, sink):
         out = args.out if args.arms == 1 else f"{args.out}/arm{arm}"
         path = write_episode(out, k, rows, task=args.task, index0=n, satlog=s["satlog"],
                              fps=args.cmd_hz, outcome=dict(
-                                 success=bool(s["success"]), done_wall=s["done_wall"],
+                                 seed=seed, success=bool(s["success"]), done_wall=s["done_wall"],
                                  success_wall=s["success_wall"], released=bool(s["released"]),
                                  no_link=no_link, final_state=list(d.qpos[:sim.NJ]),
                                  final_velocity=list(d.qvel[:sim.NJ]),

@@ -75,7 +75,7 @@ def test_first_episode_blackout_is_recorded_as_a_failure(tmp_path, monkeypatch, 
 
     monkeypatch.setitem(PROFILES, "test_blackout", dict(up=_d(0, loss=1), down=_d(0, loss=1)))
     args = SimpleNamespace(**dict(ARGS, max_s=0.05, cmd_hz=25, profile="test_blackout",
-                                 seed=0, episodes=1, arms=1, reset="free", out=str(tmp_path)))
+                                 seed=314, episodes=1, arms=1, reset="free", out=str(tmp_path)))
     m, _ = sim.build()
     sink = {}
     run_arm(m, args, 0, sink)
@@ -87,5 +87,6 @@ def test_first_episode_blackout_is_recorded_as_a_failure(tmp_path, monkeypatch, 
     assert len(load_sat(path)["state"]) > 0
     meta = json.loads((tmp_path / "meta" / "episodes.jsonl").read_text())
     assert meta["outcome"]["no_link"] and not meta["outcome"]["success"]
+    assert meta["outcome"]["seed"] == args.seed
     assert len(meta["outcome"]["final_object"]) == 7
     assert json.loads((tmp_path / "meta" / "info.json").read_text())["fps"] == 25

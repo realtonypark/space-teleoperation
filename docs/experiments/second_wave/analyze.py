@@ -61,6 +61,8 @@ def joint_rows(cs):
             if any(c is None for c in cells):
                 continue
             seeds = sorted(set.intersection(*(set(c['seeds_used']) for c in cells)))
+            if not seeds:
+                continue
             vs = [vectors(c, seeds) for c in cells]
             idx = np.random.default_rng(19).integers(0, len(seeds), (B, len(seeds)))
             def calc(i):
@@ -75,7 +77,8 @@ def joint_rows(cs):
             out.append(dict(arm=arm, profile=profile, n=len(seeds), success_did=float(point[0]),
                             success_did_ci=np.percentile(did, [2.5, 97.5]).tolist(),
                             conditional_dph_ratio_of_ratios=float(point[1]),
-                            conditional_rr_ci=np.percentile(finite, [2.5, 97.5]).tolist(),
+                            conditional_rr_ci=(np.percentile(finite, [2.5, 97.5]).tolist()
+                                               if len(finite) else [None, None]),
                             conditional_rr_dropped=B-len(finite)))
     return out
 
@@ -89,6 +92,8 @@ def acceptance_rows(cs):
             z, l = [next(c for c in tc if (c['strategy'], c['tau_h'], c['block']) == key
                          and c['profile'] == p) for p in ('zero', 'leo_relay')]
             seeds = sorted(set(z['seeds_used']) & set(l['seeds_used']))
+            if not seeds:
+                continue
             zv, lv = vectors(z, seeds), vectors(l, seeds)
             # Two 97.5% one-sided exact marginal bounds -> >=95% joint lower bound.
             sf_lo = exact_bound(l['k'], l['n'], .025, True) / exact_bound(z['k'], z['n'], .025, False)
@@ -99,7 +104,8 @@ def acceptance_rows(cs):
             out.append(dict(task=task, strategy=key[0], block=key[2], **result,
                             n_zero=z['n'], n_leo=l['n'], success_frac_lower95_exact=sf_lo,
                             conditional_dph_ratio_ci=list(df[1:3]),
-                            gross_dph_frac=l['demos_per_hour_gross']/z['demos_per_hour_gross'],
+                            gross_dph_frac=(l['demos_per_hour_gross']/z['demos_per_hour_gross']
+                                            if z['demos_per_hour_gross'] else None),
                             gross_margin_ci=np.percentile(margin, [2.5, 97.5]).tolist()))
     return out
 

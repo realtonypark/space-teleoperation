@@ -138,7 +138,7 @@ def cells(tier=1, blocks=None, strategies=("baseline",), seeds=30, profiles=None
 
 EP_RE = re.compile(r"arm (\d+) ep (\d+) seed (\d+) success=(True|False) ([\d.]+)s "
                    r"rtt_p50=(nan|[\d.]+)ms hold=([\d.]+)s unsafe=(\d+) cage=(\d+) "
-                   r"stalls=(\d+) max_dt=([\d.]+)s frames=(\d+)(?: no_link=(True|False))?")
+                   r"stalls=(\d+) max_dt=([\d.]+)s frames=(\d+)(?:[^\n]*? no_link=(True|False))?")
 UNSAFE_RE = re.compile(r"^(\d+)\s+\((.*)\)$")
 
 # `cage` is reported apart from the unsafe (link-caused) counters, and `stalls`/`max_dt_s`
@@ -169,6 +169,8 @@ def parse_stdout(text):
     agg = {}
     for line in text.splitlines():
         k, _, v = line.partition(" ")
+        if k == "demos_per_h_gross":
+            k = "demos_per_hour_gross"
         v = v.strip()
         if not v or k not in TABLE_KEYS:
             continue
@@ -221,12 +223,17 @@ def done(cell, root, seed0=0):
 
 def run_cell(cell, root, seed0=0):
     fingerprint = source_hash()
-    d = f"{root}/{cell.name}"
-    os.makedirs(d, exist_ok=True)
+    root = Path(root).resolve()
+    d = root / cell.name
+    if d.exists():
+        archive = root / "_superseded"
+        archive.mkdir(exist_ok=True)
+        d.rename(archive / f"{cell.name}-{time.time_ns()}")
+    d.mkdir(parents=True)
     cmd = ["uv", "run", "python", "-m", "spaceteleop.run",
            "--profile", cell.profile, "--task", cell.task.replace("_teleop", ""),
            "--strategy", cell.strategy,
-           "--episodes", str(cell.seeds), "--seed", str(seed0), "--out", d,
+           "--episodes", str(cell.seeds), "--seed", str(seed0), "--out", str(d),
            "--max-s", str(cell.max_s), "--tau-h", str(cell.tau_h), *cell.extra_args]
     t0 = time.monotonic()
     r = subprocess.run(cmd, capture_output=True, text=True,

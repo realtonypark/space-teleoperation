@@ -22,17 +22,13 @@ in these numbers either.
   LDLJ log dimensionless jerk. Also less negative = smoother.
 `stall_frac` is the fraction of frames with speed under STALL: the move-and-wait signature.
 
-Unsafe motion (section 6) is three LINK-caused counts, all of which must be zero for a
-profile to pass:
+The historical `unsafe` sum contains three command/geometry counters:
   move_in_hold  the commanded setpoint changed while in hold
-  vel_over      an emitted joint velocity above the clamp (measured on the satellite's own
-                applied-setpoint log, not asserted from the ramp limiter)
+  vel_over      an applied setpoint speed above the clamp (not actual joint velocity)
   keepout       the end effector left the keep-out box = the cage interior
-`cage` (the arm touched the cage) is its OWN column and is deliberately not summed into
-`unsafe`: it is operator/task-caused, not link-caused. It fires in 12/30 episodes at ZERO
-latency, because the box spawns 10-16 cm from the -y wall and the operator's chase runs the
-arm into it (audit T07), so folding it in made the section 6 gate fail on every profile for
-every arm and discriminated nothing.
+`cage` counts arm/cage contacts separately. Contacts at zero latency do not establish
+that delay cannot affect contacts. The original safety criterion includes cage;
+experiments.aggregate reports that strict gate separately from this legacy sum.
 
 `stalls` / `max_dt_s` are the audit-T06 contamination flags: satellite control cycles whose
 dt exceeded STALL_DT, i.e. CPU contention, not the link. After such a cycle the buffered
@@ -50,7 +46,7 @@ import numpy as np
 STALL = 0.05        # rad/s of joint-space speed below which the arm is "waiting"
 STALL_DT = 0.2      # s: a satellite control cycle longer than this is a load stall (T06)
 SMOOTH_HZ = 50.0    # uniform grid the applied-setpoint log is resampled onto for SAL/LDLJ
-SAFE = ("move_in_hold", "vel_over", "keepout")      # link-caused; `cage` is not (T07)
+SAFE = ("move_in_hold", "vel_over", "keepout")      # historical narrow sum; strict gate also includes cage
 
 
 def percentile(a, p):
@@ -205,7 +201,7 @@ def table(name, agg, extra=()):
             ("sal", f"{agg['sal']:.2f}"), ("ldlj", f"{agg['ldlj']:.2f}"),
             ("stall_frac", f"{agg['stall_frac']:.2f}"),
             ("unsafe_events", f"{agg['unsafe']}  ({', '.join(f'{k}={agg['events'].get(k, 0)}' for k in SAFE)})"),
-            # operator/task-caused, so it gets its own column and stays out of `unsafe` (T07)
+            # separately reported contact count; this is not causal attribution
             ("cage", f"{agg.get('cage', 0)}"),
             ("stalls", f"{agg.get('stalls', 0)}"),      # T06: load contamination flags
             ("max_dt_s", f"{agg.get('max_dt_s', 0.0):.3f}"),

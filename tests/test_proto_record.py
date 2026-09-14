@@ -2,6 +2,7 @@
 import json
 
 import numpy as np
+import pytest
 
 from spaceteleop.metrics import aggregate, episode_metrics, ldlj, sal, table
 from spaceteleop.proto import (F_SAFETY_HOLD, pack_cmd, pack_tel, unpack_cmd, unpack_tel)
@@ -136,3 +137,41 @@ def test_sat_sidecar_round_trips(tmp_path):
     assert episode_metrics(load_episode(p), True, 1.0, 100, 100, sat=sat,
                            vmax=0.5)["events"]["vel_over"] == 99
     assert load_sat(str(tmp_path / "data" / "episode_000009.npz")) is None
+
+
+def test_recorder_retry_replaces_metadata_suffix_and_stale_sidecar(tmp_path):
+    row = dict(**{"observation.state": [0.0] * 7, "action": [0.0] * 7,
+                  "timestamp": 0.0}, cmd_seq=0, rtt_ms=1.0, owd_up_ms=0.5,
+               safety_hold=False)
+    log = [(1, 0, 0, False, [0.0] * 7)]
+    out = str(tmp_path)
+    read_meta = lambda: [json.loads(line) for line in
+                         (tmp_path / "meta/episodes.jsonl").read_text().splitlines()]
+    write_episode(out, 0, [row] * 2, satlog=log, task="capture")
+    write_episode(out, 1, [row] * 3, index0=2, task="peg")
+    write_episode(out, 2, [row], index0=5)
+    # A retry from episode 1 retains episode 0 and supersedes the old 1..2 metadata.
+    write_episode(out, 1, [row] * 4, index0=2, outcome={"success": False})
+    entries = read_meta()
+    assert [e["episode_index"] for e in entries] == [0, 1]
+    assert [e["length"] for e in entries] == [2, 4]
+    assert entries[-1]["outcome"] == {"success": False}
+    info = json.loads((tmp_path / "meta/info.json").read_text())
+    assert info["total_episodes"] == 2 and info["total_frames"] == 6
+    with pytest.raises(ValueError, match="recorded prefix"):
+        write_episode(out, 3, [row], index0=6)
+    assert read_meta() == entries, "an invalid index must not modify existing metadata"
+    # Reusing the directory from episode 0 creates fresh metadata, without deleting
+    # unrelated old data files or letting an obsolete sidecar describe the new episode.
+    path = write_episode(out, 0, [row], task="capture")
+    assert len(read_meta()) == 1 and read_meta()[0]["length"] == 1
+    assert load_sat(path) is None
+    assert (tmp_path / "data/episode_000002.npz").exists()
+    info = json.loads((tmp_path / "meta/info.json").read_text())
+    assert info["total_episodes"] == info["total_frames"] == info["total_tasks"] == 1
+    assert info["splits"] == {"train": "0:1"}
+    tasks = [json.loads(line) for line in
+             (tmp_path / "meta/tasks.jsonl").read_text().splitlines()]
+    assert tasks == [{"task_index": 0, "task": "capture"}]
+    write_episode(out, 1, [row] * 2, index0=1)
+    assert [e["length"] for e in read_meta()] == [1, 2]

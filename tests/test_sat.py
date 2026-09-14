@@ -157,3 +157,55 @@ def test_playout_is_keyed_on_sequence_not_arrival():
     sp = np.array([r[4] for r in out["satlog"]])[:, 0]
     assert np.all(np.diff(sp) >= -1e-9), sp[np.argmin(np.diff(sp))]
     assert np.all(np.diff(np.array([r[2] for r in out["satlog"]])) >= 0)
+
+
+@pytest.mark.parametrize("capture_at, release_at, expected, duration", [
+    (0.004, None, False, 0.016),    # captured, but reset/release timed out
+    (0.004, 0.014, True, 0.014),    # release can use the total-cap extension
+    (0.012, None, False, 0.010),    # no extension for a capture after max_s
+])
+def test_chain_completion_budget_and_episode_counters(
+        monkeypatch, capture_at, release_at, expected, duration):
+    from spaceteleop.sat import controller
+    from spaceteleop.proto import F_DONE, F_SUCCESS
+
+    clock = [10.0]
+    monkeypatch.setattr(controller, "time", SimpleNamespace(
+        monotonic=lambda: clock[0], monotonic_ns=lambda: int(clock[0] * 1e9),
+        sleep=lambda dt: clock.__setitem__(0, clock[0] + dt)))
+    monkeypatch.setattr(controller, "RESET_MAX", 0.006)
+    m, d = sim.build("capture_chain")
+    st = sim.reset(m, d, 0, "capture_chain")
+    st.update(knockaway=7, t_knock=99.0)
+    d.time = sim_t0 = 1.0
+    packets = []
+
+    class Socket:
+        def recvfrom(self, n):
+            raise BlockingIOError
+
+        def sendto(self, packet, addr):
+            packets.append(unpack_tel(packet))
+
+    def step(m, d, sp, st, t):
+        d.time += 0.002
+        elapsed = d.time - sim_t0
+        st["success"] = elapsed >= capture_at - 1e-9
+        st["done"] = release_at is not None and elapsed >= release_at - 1e-9
+        sim._edge(st, "knock", True, d.time)
+        return st["done"]
+
+    monkeypatch.setattr(sim, "step", step)
+    result = run_episode(m, d, Socket(), None, 0, Baseline(), task="capture_chain",
+                         max_s=0.010, tel_hz=1000, linger_s=0.02, st=st)
+    assert result["success"] is expected and result["released"] is expected
+    assert abs(result["duration"] - duration) < 1e-9
+    assert abs(d.time - sim_t0 - duration) < 1e-9
+    assert result["events"]["knockaway"] == 1, "previous episodes must not be counted again"
+    assert packets[-1]["flags"] & F_DONE
+    assert bool(packets[-1]["flags"] & F_SUCCESS) is expected
+    assert (result["success_wall"] is not None) is (capture_at < 0.010)
+    if capture_at < 0.010 and release_at is None:
+        # RESET_MAX extends the total episode cap; an early capture gets the unused
+        # task time plus that extension, not merely RESET_MAX seconds from capture.
+        assert result["reset_s"] > controller.RESET_MAX
