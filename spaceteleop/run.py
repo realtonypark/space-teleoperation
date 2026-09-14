@@ -114,22 +114,16 @@ def run_arm(m, args, arm, sink):
         if chain:
             st, t_success = s["st"], s["success_wall"]
             op.restart(s["released"])
-        if len(rows) < 4:
-            if not eps:
-                raise RuntimeError(f"arm {arm} episode {k} produced {len(rows)} commands: "
-                                   f"the satellite or the link never came up")
-            # A whole episode inside a blackout (e.g. a GEO handover phased onto link
-            # start) is a failed demonstration, not a harness fault: log it and go on.
-            em = dict(eps[-1], success=False, duration_s=float(args.max_s), frames=0,
-                      rtt_p50=float("nan"), rtt_p95=float("nan"), rtt_max=float("nan"),
-                      cmd_loss=1.0, hold_frames=0, hold_s=0.0, stalls=0, max_dt_s=0.0,
-                      cage=0, no_link=True, events={k2: 0 for k2 in eps[-1]["events"]})
-            eps.append(em)
-            bw.append(s["link"])
-            print(f"arm {arm} ep {k} seed {seed} success=False NO_LINK {args.max_s:.1f}s")
-            continue
+        no_link = not rows or s["cmds_rx"] == 0
         out = args.out if args.arms == 1 else f"{args.out}/arm{arm}"
-        path = write_episode(out, k, rows, task=args.task, index0=n, satlog=s["satlog"])
+        path = write_episode(out, k, rows, task=args.task, index0=n, satlog=s["satlog"],
+                             fps=args.cmd_hz, outcome=dict(
+                                 success=bool(s["success"]), done_wall=s["done_wall"],
+                                 success_wall=s["success_wall"], released=bool(s["released"]),
+                                 no_link=no_link, final_state=list(d.qpos[:sim.NJ]),
+                                 final_velocity=list(d.qvel[:sim.NJ]),
+                                 final_object=sim.obj_pose(d, s["st"]).tolist(),
+                                 duration_s=s["done_wall"] - t0))
         n += len(rows)
         # T09: the episode ends at the success/done instant (or the cap). `done_wall` is the
         # satellite's own stamp for it; what follows is the 1 s linger, the thread join and
@@ -138,6 +132,7 @@ def run_arm(m, args, arm, sink):
         em = episode_metrics(load_episode(path), s.get("success"), dur,
                              s["cmds_sent"], s.get("cmds_rx", 0), events=s.get("events"),
                              sat=load_sat(path), vmax=Baseline.vmax)
+        em["no_link"] = no_link
         eps.append(em)
         bw.append(s["link"])
         print(f"arm {arm} ep {k} seed {seed} success={em['success']} "
@@ -145,7 +140,8 @@ def run_arm(m, args, arm, sink):
               f"hold={em['hold_s']:.2f}s unsafe={em['unsafe']} cage={em['cage']} "
               f"stalls={em['stalls']} max_dt={em['max_dt_s']:.2f}s frames={em['frames']}"
               + (f" reset={s['reset_s']:.1f}s" if chain else "")
-              + (f" innov={s['twin_innov_m'] * 1000:.1f}mm" if "twin_innov_m" in s else ""))
+              + (f" innov={s['twin_innov_m'] * 1000:.1f}mm" if "twin_innov_m" in s else "")
+              + (" no_link=True" if no_link else ""))
     sink[arm] = (eps, bw, resets)
 
 

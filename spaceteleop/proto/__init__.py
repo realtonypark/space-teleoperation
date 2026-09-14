@@ -8,6 +8,7 @@ ground from its own echoed `t_send` (never by differencing two hosts' clocks).
 NSET = 7 setpoint slots (6 SO-100 joints + 1 spare gripper slot) as the spec fixes the
 wire width at 7; the SO-100's jaw is joint index 5 and slot 6 is unused.
 """
+import math
 import struct
 
 NSET = 7
@@ -37,6 +38,8 @@ def unpack_cmd(buf):
     if len(buf) != _CMD.size or buf[:4] != CMD_MAGIC:
         return None
     f = _CMD.unpack(buf)
+    if not all(math.isfinite(v) for v in f[3:10]):
+        return None
     return dict(seq=f[1], t_send=f[2], setpoints=list(f[3:10]), flags=f[10])
 
 
@@ -49,6 +52,8 @@ def unpack_tel(buf):
     if len(buf) < _TEL.size or buf[:4] != TEL_MAGIC:
         return None
     f = _TEL.unpack(buf[:_TEL.size])
+    if not all(math.isfinite(v) for v in f[6:27]):
+        return None
     n = f[-1]
     if len(buf) != _TEL.size + n:
         return None

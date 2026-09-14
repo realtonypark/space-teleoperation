@@ -94,7 +94,8 @@ def boot_ratio(a, b, n_boot=N_BOOT, seed=0):
     """Paired bootstrap 95 % CI of demos/hour(a) / demos/hour(b). a, b = (succ, dur).
 
     Returns (point, lo, hi, dropped): `dropped` is the T20 count of resamples thrown away
-    because one arm had no success in them (the CI is narrowed by exactly those)."""
+    because one arm had no success in them. The interval conditions on the retained
+    resamples; it is not an unconditional 95 % interval when any are dropped."""
     n = len(a[0])
     if n == 0:
         return (float("nan"),) * 3 + (n_boot,)
@@ -117,6 +118,27 @@ def boot_diff(a, b, n_boot=N_BOOT, seed=1):
     d = a[idx].mean(axis=-1) - b[idx].mean(axis=-1)
     return (float(a.mean() - b.mean()), float(np.percentile(d, 2.5)),
             float(np.percentile(d, 97.5)))
+
+
+def boot_gross_diff(a, b, n_boot=N_BOOT, seed=2):
+    """Paired difference in 3600 * successes / total duration; retain failed attempts."""
+    n = len(a[0])
+    if n == 0:
+        return (float("nan"),) * 3
+    idx = np.random.default_rng(seed).integers(0, n, (n_boot, n))
+    gross = lambda x, i: 3600.0 * x[0][i].sum(axis=-1) / x[1][i].sum(axis=-1)
+    d = gross(a, idx) - gross(b, idx)
+    return (float(gross(a, np.arange(n)) - gross(b, np.arange(n))),
+            float(np.percentile(d, 2.5)), float(np.percentile(d, 97.5)))
+
+
+def holm(ps):
+    """Holm adjusted p-values, in input order; valid with dependent comparisons."""
+    out, previous = [0.0] * len(ps), 0.0
+    for rank, i in enumerate(sorted(range(len(ps)), key=ps.__getitem__)):
+        previous = max(previous, min(1.0, (len(ps) - rank) * ps[i]))
+        out[i] = previous
+    return out
 
 
 def _sal4(v, dt, fc=10.0, amp_th=0.05):
@@ -232,7 +254,7 @@ def _vectors(s):
     s["demos_per_pass"] = s["demos_per_hour"] * PASS_MIN / 60.0
     ev = s.get("aggregate", {}).get("events", {}) or {}
     s["link_unsafe"] = sum(int(ev.get(k, 0)) for k in LINK_SAFE)
-    s["cage"] = int(ev.get("cage", 0))
+    s["cage"] = int(ev.get("cage", s.get("aggregate", {}).get("cage", 0)))
 
 
 def load(raw, exclude_stalled=False):
@@ -260,14 +282,15 @@ def drop_stalled(cs):
     """T06: drop stalled episodes; the seed goes from every arm of the same cell group."""
     bad = {}
     for c in cs:
-        g = (c["task"], c["profile"], c["tau_h"])
+        g = (c["task"], c["profile"], c["tau_h"], c["block"])
         bad.setdefault(g, set()).update(
             s for s, st in zip(c["seeds_used"], c["stalled"]) if st)
     for c in cs:
-        drop = bad[(c["task"], c["profile"], c["tau_h"])]
+        c["n_original"] = c["n"]
+        drop = bad[(c["task"], c["profile"], c["tau_h"], c["block"])]
         keep = [e for e in c["episodes"] if e["seed"] not in drop]
         c["dropped_seeds"] = sorted(drop & set(c["seeds_used"]))
-        if keep and len(keep) != len(c["episodes"]):
+        if len(keep) != len(c["episodes"]):
             c["episodes"] = keep
             _vectors(c)
     return cs
@@ -331,7 +354,7 @@ def knee(cs, keys):
         zero = next((c for c in rows if c["profile"] == "zero"), None)
         sw = sorted([c for c in rows if c["profile"].startswith("sweep:")],
                     key=lambda c: c["rtt_ms"])
-        if zero is None or len(sw) < 2:
+        if zero is None or zero["k"] == 0 or len(sw) < 2 or any(c["n"] == 0 for c in sw):
             continue
         thr = 0.8 * zero["k"] / max(1, zero["n"])
         pts = [(c["rtt_ms"], c["k"] / max(1, c["n"])) for c in sw]
@@ -344,31 +367,48 @@ def knee(cs, keys):
                 hit = r0
                 break
         out[k] = dict(threshold=thr, zero_success=zero["k"] / max(1, zero["n"]),
-                      knee_ms=hit, points=pts)
+                      knee_ms=hit, points=pts,
+                      bracket_ms=next(([r0, r1] for (r0, s0), (r1, s1) in
+                                       zip(pts, pts[1:]) if s1 < thr <= s0), None),
+                      status=("below_first" if pts[0][1] < thr else
+                              "crossing" if hit is not None else "not_observed"))
     return out
 
 
 def acceptance(cs, keys):
-    """SYNTHESIS section 6: leo_relay as a fraction of the same arm's zero cell.
+    """Historical link-only point screen, plus the original cage-inclusive safety readout.
 
-    The gate is on link_unsafe over the four named profiles (T07); `cage` is counted and
-    reported next to it but does not gate, because it is operator/task-caused."""
+    Retention compares leo_relay with the same arm's zero cell. Missing profiles or
+    safety counters cannot pass. Zero observed events do not certify population safety."""
     out = {}
     for k in keys:
         rows = {c["profile"]: c for c in cs
                 if (c["strategy"], c["tau_h"], c["block"]) == k}
         z, l = rows.get("zero"), rows.get("leo_relay")
-        if not z or not l:
+        if not z or not l or not z["n"] or not l["n"]:
             continue
         sz, sl = z["k"] / max(1, z["n"]), l["k"] / max(1, l["n"])
         dz, dl = z["demos_per_hour"], l["demos_per_hour"]
         sf = sl / sz if sz else float("nan")
         df = dl / dz if dz else float("nan")
         lu = sum(rows[p]["link_unsafe"] for p in NAMED if p in rows)
-        out[k] = dict(success_frac=sf, dph_frac=df, success_zero=sz, success_leo=sl,
+        complete = all(p in rows and rows[p]["n"] > 0 for p in NAMED)
+        safety_known = all(all(key in (rows[p].get("aggregate", {}).get("events") or {})
+                               for key in LINK_SAFE) for p in NAMED if p in rows)
+        cage = sum(rows[p]["cage"] for p in NAMED if p in rows)
+        strict_known = safety_known and all(
+            "cage" in (rows[p].get("aggregate", {}).get("events") or {}) or
+            "cage" in rows[p].get("aggregate", {}) for p in NAMED if p in rows)
+        out[k] = dict(strict_unsafe_named=lu + cage,
+                      strict_safety_status=("FAIL" if lu + cage else
+                                            "ZERO_OBSERVED" if complete and strict_known else
+                                            "INCOMPLETE"), complete=complete, safety_known=safety_known,
+                      success_frac=sf, dph_frac=df, success_zero=sz, success_leo=sl,
                       dph_zero=dz, dph_leo=dl, link_unsafe_named=lu,
-                      cage_named=sum(rows[p]["cage"] for p in NAMED if p in rows),
-                      passes=bool(sf >= 0.8 and df >= 0.8 and lu == 0),
+                      cage_named=cage,
+                      passes=bool(complete and safety_known and sf >= 0.8 and df >= 0.8 and lu == 0),
+                      status=("INCOMPLETE" if not complete or not safety_known else
+                              "PASS" if sf >= 0.8 and df >= 0.8 and lu == 0 else "FAIL"),
                       profiles_present=[p for p in NAMED if p in rows])
     return out
 
@@ -380,10 +420,13 @@ def paired(cs, baseline):
         if c["strategy"] == baseline:
             continue
         b = next((x for x in cs if x["strategy"] == baseline and x["task"] == c["task"]
-                  and x["profile"] == c["profile"] and x["tau_h"] == c["tau_h"]), None)
+                  and x["profile"] == c["profile"] and x["tau_h"] == c["tau_h"]
+                  and x["block"] == c["block"]), None)
         if b is None:
             continue
         seeds = sorted(set(b["seeds_used"]) & set(c["seeds_used"]))
+        if not seeds:
+            continue
         bi = {s: i for i, s in enumerate(b["seeds_used"])}
         ci = {s: i for i, s in enumerate(c["seeds_used"])}
         bs = np.array([b["success"][bi[s]] for s in seeds], bool)
@@ -393,13 +436,17 @@ def paired(cs, baseline):
         nb, nc = int((bs & ~as_).sum()), int((as_ & ~bs).sum())
         pt, lo, hi, dropped = boot_ratio((as_, ad), (bs, bd))
         diff, dlo, dhi = boot_diff(as_, bs)
-        out.append(dict(task=c["task"], profile=c["profile"], rtt_ms=c["rtt_ms"],
+        gd, glo, ghi = boot_gross_diff((as_, ad), (bs, bd))
+        out.append(dict(task=c["task"], block=c["block"], profile=c["profile"], rtt_ms=c["rtt_ms"],
                         tau_h=c["tau_h"], arm=c["strategy"], baseline=baseline,
                         n=len(seeds), base_success=float(bs.mean()) if len(seeds) else 0.0,
                         arm_success=float(as_.mean()) if len(seeds) else 0.0,
                         diff=diff if len(seeds) else 0.0, diff_ci=[dlo, dhi],
                         b_only=nb, c_only=nc, mcnemar_p=mcnemar_p(nb, nc),
-                        dph_ratio=pt, dph_ci=[lo, hi], dropped_resamples=dropped))
+                        dph_ratio=pt, dph_ci=[lo, hi], dropped_resamples=dropped,
+                        gross_dph_diff=gd, gross_dph_diff_ci=[glo, ghi]))
+    for row, adjusted in zip(out, holm([r["mcnemar_p"] for r in out])):
+        row["mcnemar_p_holm"] = adjusted
     return sorted(out, key=lambda r: (r["task"], r["rtt_ms"], r["arm"]))
 
 
@@ -414,6 +461,7 @@ def curves(cs, legacy_dr=False):
         keys, lab = arms(tc, legacy_dr)
         for k in keys:
             rows = [c for c in tc if (c["strategy"], c["tau_h"], c["block"]) == k
+                    and c["n"] > 0
                     and (c["profile"] == "zero" or c["profile"].startswith("sweep:"))]
             if not rows:
                 continue
@@ -455,7 +503,9 @@ def results_md(cs, kn, acc, baseline, legacy_dr=False, excluded=False):
            ""]
     if excluded:
         doc += ["Stalled episodes are **excluded** (`--exclude-stalled`): a stalled seed is "
-                "dropped from every arm of the same task/profile/tau, so the pairing holds.",
+                "dropped from every arm of the same task/profile/tau/block, so the pairing holds. "
+                "Stall counts, smoothness and event diagnostics remain full-run values; "
+                "success and throughput use the retained episodes.",
                 ""]
     for task in sorted({c["task"] for c in cs}):
         tc = [c for c in cs if c["task"] == task]
@@ -464,8 +514,8 @@ def results_md(cs, kn, acc, baseline, legacy_dr=False, excluded=False):
         doc += [f"## Task `{task}`", ""]
         for title, fmt in [
             ("Success rate (95 % Wilson CI)",
-             lambda c: f"{c['k'] / c['n']:.2f} [{c['wilson'][0]:.2f},{c['wilson'][1]:.2f}] "
-                       f"{c['k']}/{c['n']}"),
+             lambda c: f"{c['k'] / max(1, c['n']):.2f} [{c['wilson'][0]:.2f},{c['wilson'][1]:.2f}] "
+                       f"{c['k']}/{c['n']}" if c["n"] else "no retained episodes"),
             ("demos/hour (gross in brackets; direct_gs also per 9.2-min pass)",
              lambda c: f"{_f(c['demos_per_hour'], 1)} [{_f(c['demos_per_hour_gross'], 1)}]" +
                        (f" = {_f(c['demos_per_pass'], 1)}/pass"
@@ -481,7 +531,7 @@ def results_md(cs, kn, acc, baseline, legacy_dr=False, excluded=False):
              lambda c: f"{_f(c['sal'])} / {_f(c['ldlj'])} / {_f(c['stall_frac'])} "
                        f"[{c['smooth_src']}]"),
             ("Stalled episodes (satellite cycle > 0.2 s)",
-             lambda c: (f"{c['n_stalled']}/{c['n']}"
+             lambda c: (f"{c['n_stalled']}/{c.get('n_original', c['n'])}"
                         if any(e.get("stalls") is not None for e in c["episodes"])
                         else "?")),
         ]:
@@ -499,7 +549,7 @@ def results_md(cs, kn, acc, baseline, legacy_dr=False, excluded=False):
                 "`--exclude-stalled`.", "",
                 "| cell | stalled / n | max cycle dt, s |", "|---|---|---|"]
         for c in sorted(bad, key=lambda c: -c["n_stalled"]):
-            doc.append(f"| {c['name']} | {c['n_stalled']}/{c['n']} | "
+            doc.append(f"| {c['name']} | {c['n_stalled']}/{c.get('n_original', c['n'])} | "
                        f"{_f(c['max_dt_s'], 2)} |")
     else:
         doc.append("None.")
@@ -507,26 +557,32 @@ def results_md(cs, kn, acc, baseline, legacy_dr=False, excluded=False):
     doc += ["## Knee: first sweep RTT with success < 0.8 x that arm's own zero cell", "",
             "| task | arm | zero success | threshold | knee (ms) |", "|---|---|---|---|---|"]
     for (task, k), v in sorted(kn.items()):
-        kms = "never (> 1000)" if v["knee_ms"] is None else f"{v['knee_ms']:.0f}"
+        kms = (f"not observed (through {v['points'][-1][0]:.0f})"
+               if v["knee_ms"] is None else
+               f"≤ {v['points'][0][0]:.0f}" if v["status"] == "below_first" else
+               f"{v['knee_ms']:.0f} (bracket {v['bracket_ms'][0]:.0f}–{v['bracket_ms'][1]:.0f})")
         doc.append(f"| {task} | {_arm(k)} | {v['zero_success']:.2f} | "
                    f"{v['threshold']:.2f} | {kms} |")
     if not kn:
         doc.append("| (no arm has a `zero` cell and >= 2 sweep points yet) |")
-    doc += ["", "## SYNTHESIS section 6 acceptance readout (leo_relay / own zero cell)", "",
+    doc += ["", "## Historical link-only acceptance screen (leo_relay / own zero cell)", "",
             "| task | arm | success frac | demos/h frac | link_unsafe on "
-            + ", ".join(NAMED) + " | cage (not gated) | gate |",
-            "|---|---|---|---|---|---|---|"]
+            + ", ".join(NAMED) + " | cage | historical gate | strict safety |",
+            "|---|---|---|---|---|---|---|---|"]
     for (task, k), v in sorted(acc.items()):
         doc.append(f"| {task} | {_arm(k)} | "
                    f"{v['success_frac']:.2f} | {v['dph_frac']:.2f} | "
                    f"{v['link_unsafe_named']} ({'+'.join(v['profiles_present'])}) | "
-                   f"{v['cage_named']} | {'PASS' if v['passes'] else 'FAIL'} |")
+                   f"{v['cage_named']} | {v['status']} | {v['strict_safety_status']} |")
     if not acc:
         doc.append("| (no arm has both a `zero` and a `leo_relay` cell yet) |")
-    doc += ["", "Acceptance (PROGRAM.md, SYNTHESIS section 6): both fractions >= 0.80 and "
-            "zero **link-caused** unsafe events. `cage` is the arm touching the cage while "
-            "the operator chases a drifting box; it fires at zero latency on every arm "
-            "(audit T07), so it is reported as operator/task-caused and does not gate.", "",
+    doc += ["", "Historical amended screen: both fractions >= 0.80 and "
+            "zero **link-caused** unsafe events, with all four named profiles and their safety counters present. "
+            "The original SYNTHESIS section 6 also gates cage contacts; strict safety includes those. "
+            "ZERO_OBSERVED means zero measured events, not a safety certification. "
+            "This is a point-estimate screen, not an uncertainty-qualified acceptance claim. "
+            "The historical operator/task-caused label for cage contacts does not establish "
+            "causal attribution or satisfy the original safety criterion.", "",
             "### Footnotes", ""]
     if any(c["linger_adjusted"] for c in cs):
         doc.append(f"- Durations: the run's `duration_s` includes the {LINGER_S:.1f} s "
@@ -557,8 +613,10 @@ def paired_md(rows, baseline, legacy_dr=False):
            f"(`b` = `{baseline}` only, `c` = arm only; two-sided exact binomial). "
            f"demos/hour ratio is arm / {baseline} with a paired bootstrap 95 % CI "
            f"({N_BOOT} resamples of the seed list); `drop` is how many resamples were "
-           f"thrown away because one arm had no success in them (audit T20 - the CI is "
-           f"narrowed by exactly those).", ""]
+           f"thrown away because one arm had no success in them. With drops, this is a conditional "
+           f"interval and does not establish unconditional 95 % coverage. Gross throughput "
+           f"below retains failure durations. Holm p-values adjust all success comparisons in this file. "
+           f"Bootstrap intervals are exploratory, pointwise, and can degenerate at all-success/all-failure boundaries.", ""]
     if legacy_dr:
         doc += ["`deadreckon` leads the baseline by 90 ms, not the nominal 60 ms "
                 "(audit_strategies F1).", ""]
@@ -573,6 +631,15 @@ def paired_md(rows, baseline, legacy_dr=False):
                    f"{r['dph_ratio']:.2f} {ci} | {r['dropped_resamples']} |")
     if not rows:
         doc.append("| (no non-baseline arm has a paired baseline cell yet) |")
+    doc += ["", "## Failure-inclusive throughput and multiplicity", "",
+            "Gross demos/hour = 3600 × successes / total active attempt duration; "
+            "reset wall time is included only when the recorded duration contains it.", "",
+            "| task | profile | arm | block | gross demos/h difference [95 % bootstrap CI] | Holm p |",
+            "|---|---|---|---|---|---|"]
+    for r in rows:
+        doc.append(f"| {r['task']} | {r['profile']} | {r['arm']} | {r['block']} | "
+                   f"{r['gross_dph_diff']:+.1f} [{r['gross_dph_diff_ci'][0]:+.1f}, "
+                   f"{r['gross_dph_diff_ci'][1]:+.1f}] | {r['mcnemar_p_holm']:.3g} |")
     zero = [r for r in rows if r["profile"] == "zero"]
     doc += ["", "## Zero-cell control (audit_strategies F3)", "",
             "A latency hider must not gain on the zero-latency cell: a gain there is "
@@ -584,7 +651,7 @@ def paired_md(rows, baseline, legacy_dr=False):
             "flag |", "|---|---|---|---|---|---|---|"]
     for r in zero:
         gain = r["diff_ci"][0] > 0 or r["dph_ci"][0] > 1.0
-        flag = "⚠ gain at zero latency" if gain else "ok"
+        flag = "⚠ gain at zero latency" if gain else "no detected gain; equivalence untested"
         doc.append(f"| {r['task']} | {r['arm']} | {r['n']} | "
                    f"{r['diff']:+.2f} [{r['diff_ci'][0]:+.2f}, {r['diff_ci'][1]:+.2f}] | "
                    f"{r['dph_ratio']:.3f} [{r['dph_ci'][0]:.3f}, {r['dph_ci'][1]:.3f}] | "

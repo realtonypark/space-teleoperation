@@ -18,6 +18,12 @@ def test_proto_roundtrip_and_junk():
     assert unpack_cmd(b"") is None and unpack_cmd(b"x" * 45) is None
     assert unpack_tel(b"x" * 200) is None
     assert unpack_tel(pack_tel(1, 2, 3, 4, 5, sp, sp, [0] * 7)[:-1]) is None   # truncated
+    for bad in (float("nan"), float("inf"), -float("inf")):
+        assert unpack_cmd(pack_cmd(0, 1, [bad] + [0.0] * 6)) is None
+        for field in range(3):
+            vectors = [[0.0] * 7 for _ in range(3)]
+            vectors[field][0] = bad
+            assert unpack_tel(pack_tel(1, 2, 3, 4, 5, *vectors)) is None
 
 
 def test_record_and_metrics(tmp_path):

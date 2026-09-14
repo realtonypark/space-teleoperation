@@ -101,12 +101,20 @@ def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.
         # way, so a training run can tell robot-executed frames from human ones for both.
         assist = bool(getattr(strategy, "assist", False) or last_flags & F_ASSIST)
         satlog.append((int(now * 1e9), t_applied, last_seq, held, sp, assist,
-                       bool(m.ntendon and d.ten_length[0] > sim.SLACK)))
-        while d.time - sim_t0 < now - t0:             # step the sim up to wall clock
-            if sim.step(m, d, sp, st, d.time) and done_at is None:
+                       bool(m.ntendon and d.ten_length[0] > sim.SLACK),
+                       d.time, list(d.qpos[:sim.NJ]), list(d.qvel[:sim.NJ]),
+                       sim.obj_pose(d, st).tolist(), st["grasped"], st["success"]))
+        budget = max_s + (RESET_MAX if task == "capture_chain" and success_at is not None else 0.0)
+        # Linger retransmits the final state; it must never advance the task or award a
+        # success after its deadline. Stop at the first terminal physics step as well.
+        while done_at is None and d.time - sim_t0 < min(now - t0, budget):
+            if sim.step(m, d, sp, st, d.time):
                 done_at, done_i = now, len(satlog)
         if st["success"] and success_at is None:
             success_at = now                          # H20: R is measured from here
+        if done_at is None and now - t0 >= max_s + (
+                RESET_MAX if task == "capture_chain" and success_at is not None else 0.0):
+            done_at, done_i = now, len(satlog)
         if now - t0 >= next_tel:
             next_tel += tel_dt
             tel_seq += 1
@@ -122,8 +130,6 @@ def run_episode(m, d, sock, down_addr, seed, strategy, task="capture", max_s=20.
             sock.sendto(pack_tel(tel_seq, time.monotonic_ns(), last_seq, last_tsend,
                                  t_applied, q, qd, sim.obj_pose(d, st), flags, frame),
                         down_addr)
-        if done_at is None and now - t0 >= max_s + (RESET_MAX if success_at else 0.0):
-            done_at, done_i = now, len(satlog)
         if done_at is not None and ev is None:
             # freeze the counters at the end of the episode: the linger after `done_at` is
             # the ground having stopped sending, which would otherwise log a hold every run

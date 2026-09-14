@@ -60,8 +60,17 @@ def test_resume_skips_existing(tmp_path):
     assert not matrix.done(c, str(tmp_path))
     d = tmp_path / c.name
     d.mkdir()
-    (d / "summary.json").write_text(json.dumps({"error": None, "episodes": [1]}))
+    summary = dict(c._asdict(), error=None, seed0=0, source_hash=matrix.source_hash(),
+                   episodes=[dict(arm=0, ep=i, seed=i) for i in range(2)])
+    (d / "summary.json").write_text(json.dumps(summary))
     assert matrix.done(c, str(tmp_path))
+    assert not matrix.done(c, str(tmp_path), seed0=100)
+    assert not matrix.done(c._replace(seeds=3), str(tmp_path))
+    assert not matrix.done(c._replace(max_s=10), str(tmp_path))
+    for change in ({"episodes": summary["episodes"][:1]}, {"source_hash": "old"},
+                   {"episodes": [dict(arm=0, ep=0, seed=0)] * 2}):
+        (d / "summary.json").write_text(json.dumps(summary | change))
+        assert not matrix.done(c, str(tmp_path))
     (d / "summary.json").write_text(json.dumps({"error": "exit 1"}))
     assert not matrix.done(c, str(tmp_path))      # a crashed cell is retried
 
@@ -88,6 +97,17 @@ def test_parse_stdout():
     assert [e["stalls"] for e in eps] == [0, 2] and eps[1]["max_dt_s"] == 1.30
     assert agg["stalls"] == 2 and agg["max_dt_s"] == 1.3
     assert agg["events"]["ramp_clip"] == 1768
+
+
+def test_blackout_episode_is_retained_and_failed_run_exits(monkeypatch):
+    eps, _ = matrix.parse_stdout(
+        "arm 0 ep 0 seed 1000 success=False 30.0s rtt_p50=nanms hold=0.00s "
+        "unsafe=0 cage=0 stalls=0 max_dt=0.01s frames=0 no_link=True\n")
+    assert len(eps) == 1 and eps[0]["no_link"] and not eps[0]["success"]
+    assert matrix.complete(eps, 1, 1000)
+    monkeypatch.setattr(matrix, "run", lambda *args: 1)
+    with pytest.raises(SystemExit, match="1"):
+        matrix.main(["--blocks", "A", "--profiles", "zero", "--seeds", "1"])
 
 
 def test_wilson():
@@ -261,7 +281,7 @@ def test_cage_and_link_unsafe_split(tmp_path):
     """T07: cage is its own column and does not gate; link_unsafe does."""
     raw, out = tmp_path / "raw", tmp_path / "out"
     raw.mkdir()
-    for p in ("zero", "leo_relay"):
+    for p in aggregate.NAMED:
         _cell(raw, "baseline", p, [1] * 10, [9.0] * 10, events={"cage": 12})
         _cell(raw, "twin", p, [1] * 10, [9.0] * 10,
               events={"cage": 3, "move_in_hold": 1})
@@ -272,9 +292,9 @@ def test_cage_and_link_unsafe_split(tmp_path):
     assert cs[("twin", "zero")]["link_unsafe"] == 1
     acc = {r["strategy"]: r for r in
            json.loads((out / "results.json").read_text())["acceptance"]}
-    assert acc["baseline"]["link_unsafe_named"] == 0 and acc["baseline"]["cage_named"] == 24
+    assert acc["baseline"]["link_unsafe_named"] == 0 and acc["baseline"]["cage_named"] == 48
     assert acc["baseline"]["passes"] is True        # cage alone does not fail the gate
-    assert acc["twin"]["link_unsafe_named"] == 2 and acc["twin"]["passes"] is False
+    assert acc["twin"]["link_unsafe_named"] == 4 and acc["twin"]["passes"] is False
     md = (out / "results.md").read_text()
     assert "link_unsafe = move_in_hold + vel_over + keepout" in md
     assert "operator/task-caused" in md

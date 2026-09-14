@@ -93,6 +93,31 @@ def test_bandwidth_cap_queues():
     assert delays[0] < 100.0, delays[0]               # ...and only builds up over time
 
 
+def test_serialization_preserves_propagation_and_fifo_ties(monkeypatch):
+    """A queued packet still propagates; equal release times retain arrival order."""
+    import heapq
+    from spaceteleop.link import emulator
+
+    for bandwidth, expected in ((100, [10.51, 10.52]), (0, [10.5, 10.5])):
+        d = _dir(_d(500, bw_bps=bandwidth, reorder=False))
+        packets = iter([b"z", b"a"])
+
+        class Socket:
+            def recvfrom(self, n):
+                try:
+                    return next(packets), None
+                except StopIteration:
+                    d.stop = True
+                    raise OSError
+
+        d.sock = Socket()
+        monkeypatch.setattr(emulator.time, "monotonic", lambda: 10.0)
+        d.recv_loop()
+        queued = [heapq.heappop(d.heap) for _ in range(2)]
+        assert [pkt for _, _, pkt in queued] == [b"z", b"a"]
+        assert all(abs(item[0] - want) < 1e-9 for item, want in zip(queued, expected))
+
+
 # --- SYNTHESIS section 7 mechanisms -----------------------------------------------
 
 import random

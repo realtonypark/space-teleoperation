@@ -7,7 +7,7 @@ Mapping to a real LeRobot v2.1 dataset:
   meta/info.json               meta/info.json  (all of the v2.1 keys, see below)
   meta/episodes.jsonl          meta/episodes.jsonl  ({episode_index, tasks, length})
   meta/tasks.jsonl             meta/tasks.jsonl  ({task_index, task})
-  observation.state (7,)       observation.state   - joint positions as the ground saw them
+  observation.state (7,)       observation.state   - joint positions shown to the operator
   action (7,)                  action              - joint setpoint put on the wire
   timestamp, frame_index, episode_index, index, next.done, task_index   same names/meaning
 Extras outside the LeRobot schema (kept as plain columns, harmless to a loader that
@@ -25,11 +25,14 @@ therefore finds every key it looks for and then fails opening the file, instead 
 on the metadata. See the ponytail note at the bottom.
 
 Sidecar `data/episode_%06d_sat.npz` holds the SATELLITE side, one row per control cycle:
-`t_ns` (the cycle), `t_applied_ns` (when the newest command first reached the arm),
-`cmd_seq`, `hold`, `setpoint` (7). The main table pairs the newest telemetry the ground
-held with the command it sent on the same tick, which on leo_relay is ~85 ms of
-observation-action skew; anything that needs the true applied action at a true instant
-re-pairs it from here instead of trusting that skew.
+`t_ns` (the cycle), `t_applied_ns` (when the newest command first reached the controller),
+`cmd_seq`, `hold`, `setpoint` (7). Schema 2 also records the pre-step `sim_time`, actual
+`state`/`velocity` (6), `object` (7), `grasped`, and `success`. The main table stores the
+delay-aged or twin-predicted observation that caused the action, its source telemetry
+sequence and timestamps, and the actual command timestamp/sequence. `predicted` marks a
+twin substitution; source timestamps describe the telemetry, not the prediction horizon.
+Before schema 2 the main state was the NEWEST telemetry, and its command sequence was
+one ahead of the wire. Do not concatenate these schemas without explicit conversion.
 To convert: read the npz, build a pandas DataFrame per episode, write parquet. No
 lerobot dependency here on purpose.
 # ponytail: npz + jsonl, no parquet/pyarrow dependency. Add the converter when a training
@@ -71,6 +74,10 @@ def write_sat(out_dir, ep_index, satlog):
     if not satlog:
         return None
     col = lambda i, t: np.array([r[i] if len(r) > i else 0 for r in satlog], t)
+    actual = ({k: col(i, dtype) for i, k, dtype in (
+        (7, "sim_time", np.float64), (8, "state", np.float32),
+        (9, "velocity", np.float32), (10, "object", np.float32),
+        (11, "grasped", bool), (12, "success", bool))} if len(satlog[0]) > 12 else {})
     path = f"{out_dir}/data/episode_{ep_index:06d}_sat.npz"
     np.savez_compressed(
         path, t_ns=np.array([r[0] for r in satlog], np.int64),
@@ -78,19 +85,20 @@ def write_sat(out_dir, ep_index, satlog):
         cmd_seq=np.array([r[2] for r in satlog], np.int64),
         hold=np.array([r[3] for r in satlog], bool),
         setpoint=np.array([r[4] for r in satlog], np.float32),
-        assist=col(5, bool), taut=col(6, bool))
+        assist=col(5, bool), taut=col(6, bool), **actual)
     return path
 
 
-def write_episode(out_dir, ep_index, rows, task="capture", index0=0, satlog=()):
+def write_episode(out_dir, ep_index, rows, task="capture", index0=0, satlog=(),
+                  fps=FPS, outcome=None):
     """rows: list of dicts with the COLS keys (minus index/episode_index). -> npz path."""
     os.makedirs(f"{out_dir}/data", exist_ok=True)
     os.makedirs(f"{out_dir}/meta", exist_ok=True)
     n = len(rows)
     ti, ntasks = _task_index(out_dir, task)
     arr = {
-        "observation.state": np.array([r["observation.state"] for r in rows], np.float32),
-        "action": np.array([r["action"] for r in rows], np.float32),
+        "observation.state": np.array([r["observation.state"] for r in rows], np.float32).reshape(n, 7),
+        "action": np.array([r["action"] for r in rows], np.float32).reshape(n, 7),
         "timestamp": np.array([r["timestamp"] for r in rows], np.float32),
         "frame_index": np.arange(n, dtype=np.int64),
         "episode_index": np.full(n, ep_index, np.int64),
@@ -104,13 +112,23 @@ def write_episode(out_dir, ep_index, rows, task="capture", index0=0, satlog=()):
         # H11: which frames a primitive drove, from whichever side ran it (P or Pg)
         "assist": np.array([r.get("assist", False) for r in rows], bool),
     }
+    if rows and "command.t_send_ns" in rows[0]:
+        for key, dtype in (("observation.object", np.float32),
+                           ("observation.tel_seq", np.int64),
+                           ("observation.t_send_ns", np.int64),
+                           ("observation.t_rx_ns", np.int64),
+                           ("observation.predicted", bool),
+                           ("command.t_send_ns", np.int64)):
+            arr[key] = np.array([r[key] for r in rows], dtype)
     path = f"{out_dir}/data/episode_{ep_index:06d}.npz"
     np.savez_compressed(path, **arr)
     write_sat(out_dir, ep_index, satlog)
     with open(f"{out_dir}/meta/episodes.jsonl", "a") as f:
-        f.write(json.dumps({"episode_index": ep_index, "tasks": [task], "length": n}) + "\n")
+        f.write(json.dumps({"episode_index": ep_index, "tasks": [task], "length": n,
+                            **({"outcome": outcome} if outcome is not None else {})}) + "\n")
     neps = ep_index + 1
-    json.dump({"codebase_version": "v2.1", "robot_type": "so_arm100", "fps": FPS,
+    json.dump({"codebase_version": "v2.1", "recording_schema": 2,
+               "robot_type": "so_arm100", "fps": fps,
                "total_episodes": neps, "total_frames": index0 + n, "total_tasks": ntasks,
                "total_videos": 0, "total_chunks": (neps - 1) // CHUNK + 1,
                "chunks_size": CHUNK, "splits": {"train": f"0:{neps}"},
@@ -119,7 +137,9 @@ def write_episode(out_dir, ep_index, rows, task="capture", index0=0, satlog=()):
                "data_path": "data/episode_{episode_index:06d}.npz",
                "video_path": None,
                "features": {k: {"dtype": str(v.dtype), "shape": list(v.shape[1:]) or [1],
-                                "names": JOINTS[:v.shape[1]] if v.ndim > 1 else None}
+                                "names": (["x", "y", "z", "qw", "qx", "qy", "qz"]
+                                          if k == "observation.object" else JOINTS[:v.shape[1]])
+                                         if v.ndim > 1 else None}
                             for k, v in arr.items()}},
               open(f"{out_dir}/meta/info.json", "w"), indent=1)
     return path

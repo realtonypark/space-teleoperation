@@ -9,7 +9,7 @@ for cross-cell parallelism, the GIL inflates dwell). Cells go to a thread pool o
 each thread only waits on its subprocess, so --jobs is the number of concurrent run.py
 PROCESSES. Every cell of a run uses the same seed base, so arms are paired seed by seed.
 
-Resumable: a cell whose `summary.json` exists and carries no error is skipped. A crashed
+Resumable: only a complete cell with matching parameters, seeds and source hash is skipped. A crashed
 cell writes `summary.json` with the error and its stdout, and IS retried next time, which
 is what you want for the Tier 1 blocks whose strategy or task has not landed yet.
 
@@ -18,6 +18,7 @@ arms by role -- "all" (every named strategy), "primary" (minus --ablations, the 
 arms selection.md drops from block E) and "base" (the --baseline arm alone).
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -26,6 +27,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import NamedTuple
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from spaceteleop.link.profiles import rtt_ms                            # noqa: E402
@@ -135,8 +137,8 @@ def cells(tier=1, blocks=None, strategies=("baseline",), seeds=30, profiles=None
 
 
 EP_RE = re.compile(r"arm (\d+) ep (\d+) seed (\d+) success=(True|False) ([\d.]+)s "
-                   r"rtt_p50=([\d.]+)ms hold=([\d.]+)s unsafe=(\d+) cage=(\d+) "
-                   r"stalls=(\d+) max_dt=([\d.]+)s frames=(\d+)")
+                   r"rtt_p50=(nan|[\d.]+)ms hold=([\d.]+)s unsafe=(\d+) cage=(\d+) "
+                   r"stalls=(\d+) max_dt=([\d.]+)s frames=(\d+)(?: no_link=(True|False))?")
 UNSAFE_RE = re.compile(r"^(\d+)\s+\((.*)\)$")
 
 # `cage` is reported apart from the unsafe (link-caused) counters, and `stalls`/`max_dt_s`
@@ -162,7 +164,7 @@ def parse_stdout(text):
     eps = [dict(arm=int(m[1]), ep=int(m[2]), seed=int(m[3]), success=m[4] == "True",
                 duration_s=float(m[5]), rtt_p50=float(m[6]), hold_s=float(m[7]),
                 unsafe=int(m[8]), cage=int(m[9]), stalls=int(m[10]),
-                max_dt_s=float(m[11]), frames=int(m[12]))
+                max_dt_s=float(m[11]), frames=int(m[12]), no_link=m[13] == "True")
            for m in EP_RE.finditer(text)]
     agg = {}
     for line in text.splitlines():
@@ -185,17 +187,40 @@ def _kv(s):
             for p in s.split(",") if "=" in p}
 
 
-def done(cell, root):
-    """True if this cell already has a clean summary.json (resume)."""
+def source_hash():
+    """Fingerprint executable inputs, including uncommitted fixes and locked dependencies."""
+    root = Path(__file__).resolve().parents[1]
+    paths = sorted((root / "spaceteleop").rglob("*.py"))
+    paths += [root / "experiments/matrix.py", root / "pyproject.toml", root / "uv.lock"]
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(str(path.relative_to(root)).encode() + b"\0" + path.read_bytes())
+    return digest.hexdigest()
+
+
+def complete(episodes, count, seed0):
+    return (len(episodes) == count and
+            [(e.get("arm"), e.get("ep"), e.get("seed")) for e in episodes] ==
+            [(0, i, seed0 + i) for i in range(count)])
+
+
+def done(cell, root, seed0=0):
+    """Resume only a complete cell with identical parameters, seeds and executable inputs."""
     p = f"{root}/{cell.name}/summary.json"
     try:
         with open(p) as f:
-            return not json.load(f).get("error")
+            s = json.load(f)
+        return (not s.get("error") and s.get("source_hash") == source_hash()
+                and s.get("seed0") == seed0
+                and all(s.get(k) == (list(v) if isinstance(v, tuple) else v)
+                        for k, v in cell._asdict().items())
+                and complete(s.get("episodes", []), cell.seeds, seed0))
     except (OSError, ValueError):
         return False
 
 
 def run_cell(cell, root, seed0=0):
+    fingerprint = source_hash()
     d = f"{root}/{cell.name}"
     os.makedirs(d, exist_ok=True)
     cmd = ["uv", "run", "python", "-m", "spaceteleop.run",
@@ -213,13 +238,16 @@ def run_cell(cell, root, seed0=0):
     err = None
     if r.returncode != 0:
         err = f"exit {r.returncode}: " + ((r.stderr or out).strip().splitlines() or [""])[-1]
-    elif not eps:
-        err = "no episodes parsed from stdout"
+    elif not complete(eps, cell.seeds, seed0):
+        err = "incomplete or mismatched episode seed vector"
+    elif source_hash() != fingerprint:
+        err = "executable inputs changed during run"
     # schema flags the aggregator reads: `duration_s` already ends at the success/done
     # instant (audit T09/F2, run.py), and SAL/LDLJ/stall_frac already come from the
     # satellite applied-setpoint sidecar (T05). Without these it would apply both
     # corrections a second time.
     s = dict(cell._asdict(), name=cell.name, seed0=seed0, cmd=" ".join(cmd),
+             source_hash=fingerprint,
              rtt_ms=rtt_ms(cell.profile), linger_excluded=True,
              wall_s=round(time.monotonic() - t0, 1), error=err,
              aggregate=dict(agg, smoothness_source="sat"), episodes=eps)
@@ -239,7 +267,7 @@ def est_s(cell):
 
 def run(cs, root, jobs, seed0=0):
     os.makedirs(root, exist_ok=True)
-    pend = [c for c in cs if not done(c, root)]
+    pend = [c for c in cs if not done(c, root, seed0)]
     print(f"{len(cs)} cells, {len(cs) - len(pend)} already done, {len(pend)} to run "
           f"on {jobs} processes (estimate {_fmt(sum(map(est_s, pend)) / jobs)})")
     t0, times, bad = time.monotonic(), [], 0
@@ -276,6 +304,8 @@ def main(argv=None):
     p.add_argument("--out", default="docs/experiments/raw")
     p.add_argument("--dry-run", action="store_true")
     a = p.parse_args(argv)
+    if a.seeds < 1 or a.jobs < 1 or a.seed0 < 0:
+        p.error("seeds and jobs must be positive; seed0 must be nonnegative")
     split = lambda s: [x for x in (s or "").split(",") if x]
     cs = cells(a.tier, split(a.blocks) or None, split(a.strategies), a.seeds,
                split(a.profiles) or None, split(a.ablations), a.baseline,
@@ -288,7 +318,8 @@ def main(argv=None):
         print(f"\n{len(cs)} cells, {sum(c.seeds for c in cs)} episodes; "
               f"estimate {_fmt(tot)} serial, {_fmt(tot / a.jobs)} on {a.jobs} jobs")
         return cs
-    run(cs, a.out, a.jobs, a.seed0)
+    if run(cs, a.out, a.jobs, a.seed0):
+        raise SystemExit(1)
     return cs
 
 

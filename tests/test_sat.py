@@ -2,8 +2,10 @@
 import socket
 import threading
 import time
+from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from spaceteleop import sim
 from spaceteleop.proto import F_ASSIST, F_SAFETY_HOLD, pack_cmd, unpack_tel
@@ -11,6 +13,38 @@ from spaceteleop.sat.controller import run_episode
 from spaceteleop.strategies.baseline import Baseline
 
 TARGET = [0.6, -1.2, 1.2, 1.0, -1.0, 0.0, 0.0]
+
+
+@pytest.mark.parametrize("win_at, expected", [(0.004, True), (0.012, False)])
+def test_done_freezes_simulation_and_outcome_during_linger(monkeypatch, win_at, expected):
+    """A success after the deadline cannot get credit or advance the next chain scene."""
+    from spaceteleop.sat import controller
+
+    clock = [10.0]
+    monkeypatch.setattr(controller, "time", SimpleNamespace(
+        monotonic=lambda: clock[0], monotonic_ns=lambda: int(clock[0] * 1e9),
+        sleep=lambda dt: clock.__setitem__(0, clock[0] + dt)))
+    m, d = sim.build()
+    packets = []
+
+    class Socket:
+        def recvfrom(self, n):
+            raise BlockingIOError
+
+        def sendto(self, packet, addr):
+            packets.append(unpack_tel(packet))
+
+    def step(m, d, sp, st, t):
+        d.time += 0.002
+        st["success"] = d.time >= win_at
+        return st["success"]
+
+    monkeypatch.setattr(sim, "step", step)
+    result = run_episode(m, d, Socket(), None, 0, Baseline(), max_s=0.010,
+                         tel_hz=1000, linger_s=0.02)
+    assert result["success"] is expected
+    assert d.time <= (win_at if expected else 0.010) + 1e-9
+    assert len(packets) > 10, "the terminal frame still needs retransmission"
 
 
 def _pair():

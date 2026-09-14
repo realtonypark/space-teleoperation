@@ -103,7 +103,7 @@ class _Dir:
         self.heap, self.lock = [], threading.Lock()
         self.stop = False
         self.bad = False
-        self.sent = self.dropped = self.bytes = 0
+        self.sent = self.dropped = self.bytes = self.received = 0
         self.t0 = time.monotonic()
         self.next_free = 0.0
         # random phase: otherwise every episode would start inside the same blackout
@@ -182,18 +182,20 @@ class _Dir:
             now = time.monotonic()
             t = now - self.t0
             self.bytes += len(pkt)
+            self.received += 1
             extra, force_bad = self.structure(t)
             if self.blacked_out(t) or self._lost(force_bad):
                 self.dropped += 1
                 continue
-            rel = now + self.delay() + extra / 1000.0
+            delay = max(0.0, self.delay() + extra / 1000.0)
+            rel = now + delay
             if self.p["bw_bps"]:
                 self.next_free = max(self.next_free, now) + len(pkt) / self.p["bw_bps"]
-                rel = max(rel, self.next_free)
+                rel = self.next_free + delay
             if not self.p["reorder"]:
                 rel = self.last_release = max(rel, self.last_release)
             with self.lock:
-                heapq.heappush(self.heap, (rel, self.sent + self.dropped, pkt))
+                heapq.heappush(self.heap, (rel, self.received, pkt))
 
     def drain_loop(self):
         while not self.stop:

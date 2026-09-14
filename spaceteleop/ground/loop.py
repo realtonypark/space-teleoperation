@@ -68,23 +68,30 @@ def run_episode(sock, up_addr, operator, strategy, cmd_hz=50.0, tau_h=0.17, max_
             break
         if now - t0 > max_s + 3.0:
             break
-        seen = next((t for ts, t in reversed(hist) if ts <= now - tau_h), None)
-        if seen is None:                                  # nothing has arrived yet
+        source = next(((ts, t) for ts, t in reversed(hist) if ts <= now - tau_h), None)
+        if source is None:                                # nothing has arrived yet
             poll(now + 0.002)
             continue
-        seen = strategy.observe(seen, now)     # identity unless the strategy shows a twin
+        received_at, raw_seen = source
+        seen = strategy.observe(raw_seen, now) # identity unless the strategy shows a twin
         sp = strategy.ground_step(seen, operator.step(seen, dt))
         # H11 Pg: a ground-side primitive tells the satellite that THIS frame is
         # robot-executed, so the recorded assist mask means the same thing for P and Pg
         assist = bool(getattr(strategy, "assist", False))
         ts = time.monotonic_ns()
         sock.sendto(pack_cmd(seq, ts, sp, F_ASSIST if assist else 0), up_addr)
-        seq, sent = seq + 1, sent + 1
-        rows.append(dict(**{"observation.state": list(hist[-1][1]["q"]), "action": list(sp),
+        rows.append(dict(**{"observation.state": list(seen["q"]), "action": list(sp),
+                            "observation.object": list(seen["obj"]),
+                            "observation.tel_seq": raw_seen["seq"],
+                            "observation.t_send_ns": raw_seen["t_send"],
+                            "observation.t_rx_ns": int(received_at * 1e9),
+                            "observation.predicted": seen is not raw_seen,
+                            "command.t_send_ns": ts,
                             "timestamp": now - t0, "next.done": False},
                          cmd_seq=seq, rtt_ms=rtt_ms, owd_up_ms=rtt_ms / 2,
                          safety_hold=bool(hist[-1][1]["flags"] & F_SAFETY_HOLD),
                          assist=assist))
+        seq, sent = seq + 1, sent + 1
         next_send += dt
         if next_send < time.monotonic():
             next_send = time.monotonic()   # fell behind: resync, never burst to catch up
